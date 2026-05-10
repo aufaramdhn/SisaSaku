@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
+import 'package:sisasaku/core/enums.dart';
 import 'package:sisasaku/features/transaction/domain/entities/transaction_entity.dart';
 import 'package:sisasaku/features/transaction/presentation/providers/transaction_provider.dart';
 import 'package:sisasaku/routes/app_router.dart';
@@ -26,6 +28,8 @@ class _TransactionHistoryPageState
   String _searchQuery = '';
   bool _isSearching = false;
   final _searchController = TextEditingController();
+  int _currentMonth = DateTime.now().month;
+  int _currentYear = DateTime.now().year;
 
   @override
   void dispose() {
@@ -53,43 +57,6 @@ class _TransactionHistoryPageState
     }
   }
 
-  IconData _parseIcon(String iconName) {
-    switch (iconName) {
-      case 'restaurant':
-        return Icons.restaurant_rounded;
-      case 'directions_bus':
-        return Icons.directions_bus_rounded;
-      case 'home_work':
-        return Icons.home_work_rounded;
-      case 'shopping_bag':
-        return Icons.shopping_bag_rounded;
-      case 'local_cafe':
-        return Icons.local_cafe_rounded;
-      case 'phone_iphone':
-        return Icons.phone_iphone_rounded;
-      case 'more_horiz':
-        return Icons.more_horiz_rounded;
-      case 'payments':
-        return Icons.payments_rounded;
-      case 'bolt':
-        return Icons.bolt_rounded;
-      case 'shopping_cart':
-        return Icons.shopping_cart_rounded;
-      case 'account_balance_wallet':
-        return Icons.account_balance_wallet_rounded;
-      default:
-        return Icons.category_rounded;
-    }
-  }
-
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return AppColors.textSecondary;
-    }
-  }
-
   Future<void> _deleteTransaction(String id) async {
     try {
       await ref.read(deleteTransactionProvider(id).future);
@@ -109,15 +76,14 @@ class _TransactionHistoryPageState
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
     final monthlyTransactions = ref.watch(
-      monthlyTransactionsProvider((now.month, now.year)),
+      monthlyTransactionsProvider((_currentMonth, _currentYear)),
     );
     final monthlyIncome = ref.watch(
-      monthlyIncomeProvider((now.month, now.year)),
+      monthlyIncomeProvider((_currentMonth, _currentYear)),
     );
     final monthlyExpense = ref.watch(
-      monthlyExpenseProvider((now.month, now.year)),
+      monthlyExpenseProvider((_currentMonth, _currentYear)),
     );
     final categoriesAsync = ref.watch(categoriesProvider);
 
@@ -289,6 +255,36 @@ class _TransactionHistoryPageState
     );
   }
 
+  String get _monthLabel {
+    final bulan = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    ];
+    return '${bulan[_currentMonth - 1]} $_currentYear';
+  }
+
+  void _previousMonth() {
+    setState(() {
+      if (_currentMonth == 1) {
+        _currentMonth = 12;
+        _currentYear--;
+      } else {
+        _currentMonth--;
+      }
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      if (_currentMonth == 12) {
+        _currentMonth = 1;
+        _currentYear++;
+      } else {
+        _currentMonth++;
+      }
+    });
+  }
+
   Widget _buildMonthSelector() {
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -310,15 +306,15 @@ class _TransactionHistoryPageState
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            onPressed: () {},
+            onPressed: _previousMonth,
             icon: const Icon(
               Icons.chevron_left,
               color: AppColors.textSecondary,
             ),
           ),
-          const Text(
-            'Oktober 2023',
-            style: TextStyle(
+          Text(
+            _monthLabel,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               height: 1.3,
@@ -326,7 +322,7 @@ class _TransactionHistoryPageState
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: _nextMonth,
             icon: const Icon(
               Icons.chevron_right,
               color: AppColors.textSecondary,
@@ -682,17 +678,16 @@ class _TransactionHistoryPageState
         var filtered = _filter == 'all'
             ? transactions
             : transactions.where((t) {
-                if (_filter == 'income') return t.jenis.label == 'masuk';
-                return t.jenis.label == 'keluar';
+                if (_filter == 'income') return t.jenis == TransactionType.income;
+                return t.jenis == TransactionType.expense;
               }).toList();
+
+        final categoryMap = {for (final c in categories) c.id: c};
 
         if (_searchQuery.isNotEmpty) {
           final q = _searchQuery.toLowerCase();
           filtered = filtered.where((t) {
-            final cat = categories.cast<dynamic>().firstWhere(
-              (c) => c.id == t.idKategori,
-              orElse: () => null,
-            );
+            final cat = categoryMap[t.idKategori];
             final catName = cat?.nama?.toString().toLowerCase() ?? '';
             final desc = t.deskripsi?.toLowerCase() ?? '';
             return catName.contains(q) || desc.contains(q);
@@ -782,14 +777,11 @@ class _TransactionHistoryPageState
                   child: Column(
                     children: List.generate(entry.value.length, (index) {
                       final tx = entry.value[index];
-                      final cat = categories.cast<dynamic>().firstWhere(
-                        (c) => c.id == tx.idKategori,
-                        orElse: () => null,
-                      );
+                      final cat = categoryMap[tx.idKategori];
                       final catName = cat?.nama?.toString() ?? 'Tidak diketahui';
-                      final catIcon = _parseIcon(cat?.ikon?.toString() ?? 'category');
-                      final catColor = _parseColor(cat?.warna?.toString() ?? '#9CA3AF');
-                      final isIncome = tx.jenis.label == 'masuk';
+                      final catIcon = CategoryUiHelpers.parseIcon(cat?.ikon?.toString() ?? 'category');
+                      final catColor = CategoryUiHelpers.parseColor(cat?.warna?.toString() ?? '#9CA3AF');
+                      final isIncome = tx.jenis == TransactionType.income;
 
                       return Dismissible(
                         key: Key(tx.id),

@@ -6,6 +6,7 @@ import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
 import 'package:sisasaku/features/transaction/domain/entities/transaction_entity.dart';
@@ -67,6 +68,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     }
   }
 
+  static const _uuid = Uuid();
+
   Future<void> _submit() async {
     final nominal = CurrencyFormatter.parse(_nominalController.text);
     if (nominal <= 0) {
@@ -79,7 +82,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     }
 
     final transaction = TransactionEntity(
-      id: const Uuid().v4(),
+      id: _uuid.v4(),
       nominal: nominal,
       jenis: _isExpense ? TransactionType.expense : TransactionType.income,
       tanggal: _selectedDate,
@@ -93,7 +96,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(addTransactionProvider(transaction).future);
+      final repository = await ref.read(transactionRepositoryProvider.future);
+      await repository.addTransaction(transaction);
       if (mounted) {
         _showSnackBar('Transaksi berhasil disimpan');
         context.pop();
@@ -113,35 +117,6 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
-  }
-
-  IconData _parseIcon(String iconName) {
-    switch (iconName) {
-      case 'restaurant':
-        return Icons.restaurant;
-      case 'directions_bus':
-        return Icons.directions_bus;
-      case 'home_work':
-        return Icons.home_work;
-      case 'shopping_bag':
-        return Icons.shopping_bag;
-      case 'local_cafe':
-        return Icons.local_cafe;
-      case 'phone_iphone':
-        return Icons.phone_iphone;
-      case 'more_horiz':
-        return Icons.more_horiz;
-      case 'payments':
-        return Icons.payments;
-      case 'bolt':
-        return Icons.bolt;
-      case 'shopping_cart':
-        return Icons.shopping_cart;
-      case 'account_balance_wallet':
-        return Icons.account_balance_wallet;
-      default:
-        return Icons.category;
-    }
   }
 
   @override
@@ -465,7 +440,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _parseIcon(cat.ikon),
+                          CategoryUiHelpers.parseIcon(cat.ikon),
                           color: isSelected
                               ? AppColors.primaryColor
                               : AppColors.textSecondary,

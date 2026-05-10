@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/features/bill/presentation/providers/bill_provider.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
 import 'package:sisasaku/features/dashboard/presentation/widgets/bill_warning_card.dart';
@@ -24,43 +26,6 @@ class DashboardPage extends ConsumerStatefulWidget {
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   static const _headerAvatarUrl =
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80';
-
-  IconData _parseIcon(String iconName) {
-    switch (iconName) {
-      case 'restaurant':
-        return Icons.restaurant_rounded;
-      case 'directions_bus':
-        return Icons.directions_bus_rounded;
-      case 'home_work':
-        return Icons.home_work_rounded;
-      case 'shopping_bag':
-        return Icons.shopping_bag_rounded;
-      case 'local_cafe':
-        return Icons.local_cafe_rounded;
-      case 'phone_iphone':
-        return Icons.phone_iphone_rounded;
-      case 'more_horiz':
-        return Icons.more_horiz_rounded;
-      case 'payments':
-        return Icons.payments_rounded;
-      case 'bolt':
-        return Icons.bolt_rounded;
-      case 'shopping_cart':
-        return Icons.shopping_cart_rounded;
-      case 'account_balance_wallet':
-        return Icons.account_balance_wallet_rounded;
-      default:
-        return Icons.category_rounded;
-    }
-  }
-
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return AppColors.textSecondary;
-    }
-  }
 
   String _formatWaktu(DateTime date) {
     final now = DateTime.now();
@@ -250,18 +215,27 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   // Saldo Card
-                  monthlyIncome.when(
-                    data: (income) => monthlyExpense.when(
-                      data: (expense) => SaldoCard(
+                  Builder(
+                    builder: (_) {
+                      final income = monthlyIncome.when(
+                        data: (v) => v,
+                        loading: () => 0.0,
+                        error: (_, _) => 0.0,
+                      );
+                      final expense = monthlyExpense.when(
+                        data: (v) => v,
+                        loading: () => 0.0,
+                        error: (_, _) => 0.0,
+                      );
+                      final isLoading = monthlyIncome.isLoading ||
+                          monthlyExpense.isLoading;
+                      if (isLoading) return const _SectionLoader();
+                      return SaldoCard(
                         saldo: income - expense,
                         pemasukan: income,
                         pengeluaran: expense,
-                      ),
-                      loading: () => const _SectionLoader(),
-                      error: (err, stack) => Text('Error: $err'),
-                    ),
-                    loading: () => const _SectionLoader(),
-                    error: (err, stack) => Text('Error: $err'),
+                      );
+                    },
                   ),
                   const SizedBox(height: AppSpacing.md),
                   // Bill Warning Card
@@ -384,49 +358,47 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
                           final recentTransactions =
                               transactions.take(3).toList();
+                          final categories = categoriesAsync.when(
+                            data: (list) => list,
+                            loading: () => <dynamic>[],
+                            error: (_, _) => <dynamic>[],
+                          );
+                          final categoryMap = {
+                            for (final c in categories) c.id: c,
+                          };
 
-                          return categoriesAsync.when(
-                            data: (categories) {
-                              return Column(
-                                children: List.generate(
-                                  recentTransactions.length,
-                                  (index) {
-                                    final transaction =
-                                        recentTransactions[index];
-                                    final cat = categories.cast<dynamic>().firstWhere(
-                                      (c) => c.id == transaction.idKategori,
-                                      orElse: () => null,
-                                    );
-                                    final catName =
-                                        cat?.nama?.toString() ?? 'Tidak diketahui';
-                                    final catIcon = _parseIcon(
-                                        cat?.ikon?.toString() ?? 'category');
-                                    final catColor = _parseColor(
-                                        cat?.warna?.toString() ?? '#9CA3AF');
+                          return Column(
+                            children: List.generate(
+                              recentTransactions.length,
+                              (index) {
+                                final transaction =
+                                    recentTransactions[index];
+                                final cat = categoryMap[transaction.idKategori];
+                                final catName =
+                                    cat?.nama?.toString() ?? 'Tidak diketahui';
+                                final catIcon = CategoryUiHelpers.parseIcon(
+                                    cat?.ikon?.toString() ?? 'category');
+                                final catColor = CategoryUiHelpers.parseColor(
+                                    cat?.warna?.toString() ?? '#9CA3AF');
 
-                                    return TransactionRow(
-                                      kategoriNama: catName,
-                                      kategoriIcon: catIcon,
-                                      kategoriColor: catColor,
-                                      waktu: _formatWaktu(transaction.tanggal),
-                                      nominal: transaction.nominal,
-                                      isIncome: transaction.jenis.label == 'masuk',
-                                      showDivider: index !=
-                                          recentTransactions.length - 1,
-                                      onTap: () => context.push(
-                                        AppRouter.transactionDetail.replaceAll(
-                                          ':id',
-                                          transaction.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                            loading: () => const _SectionLoader(),
-                            error: (err, stack) =>
-                                Center(child: Text('Error: $err')),
+                                return TransactionRow(
+                                  kategoriNama: catName,
+                                  kategoriIcon: catIcon,
+                                  kategoriColor: catColor,
+                                  waktu: _formatWaktu(transaction.tanggal),
+                                  nominal: transaction.nominal,
+                                  isIncome: transaction.jenis == TransactionType.income,
+                                  showDivider: index !=
+                                      recentTransactions.length - 1,
+                                  onTap: () => context.push(
+                                    AppRouter.transactionDetail.replaceAll(
+                                      ':id',
+                                      transaction.id,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           );
                         },
                         loading: () => const _SectionLoader(),
