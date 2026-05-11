@@ -8,6 +8,7 @@ import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/features/category/domain/entities/category_entity.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
+import 'package:sisasaku/routes/app_router.dart';
 
 class CategoryPage extends ConsumerStatefulWidget {
   const CategoryPage({super.key});
@@ -37,7 +38,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                 height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withOpacity(0.4),
+                  color: AppColors.primaryLight.withValues(alpha: 0.4),
                 ),
               ),
             ),
@@ -63,13 +64,16 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                             color: AppColors.textSecondary,
                           ),
                           style: IconButton.styleFrom(
-                            backgroundColor: AppColors.primaryLight.withOpacity(0.5),
+                            backgroundColor: AppColors.primaryLight.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Text(
                           AppStrings.appName,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primaryColor,
                               ),
@@ -79,7 +83,9 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
                   sliver: SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,7 +117,9 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
                   sliver: categoriesAsync.when(
                     data: (categories) {
                       final filtered = categories.where((c) {
@@ -123,25 +131,25 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       }).toList();
 
                       return SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: AppSpacing.md,
-                          crossAxisSpacing: AppSpacing.md,
-                          childAspectRatio: 1.05,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            if (index == filtered.length) {
-                              return _AddNewCard(onTap: () => context.push(AppRouter.addCategory));
-                            }
-                            final category = filtered[index];
-                            return _CategoryCard(
-                              category: category,
-                              onEdit: () {},
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: AppSpacing.md,
+                              crossAxisSpacing: AppSpacing.md,
+                              childAspectRatio: 1.05,
+                            ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          if (index == filtered.length) {
+                            return _AddNewCard(
+                              onTap: () => context.push(AppRouter.addCategory),
                             );
-                          },
-                          childCount: filtered.length + 1,
-                        ),
+                          }
+                          final category = filtered[index];
+                          return _CategoryCard(
+                            category: category,
+                            onEdit: () {},
+                          );
+                        }, childCount: filtered.length + 1),
                       );
                     },
                     loading: () => const SliverToBoxAdapter(
@@ -246,10 +254,7 @@ class _CategoryCard extends StatelessWidget {
   final CategoryEntity category;
   final VoidCallback onEdit;
 
-  const _CategoryCard({
-    required this.category,
-    required this.onEdit,
-  });
+  const _CategoryCard({required this.category, required this.onEdit});
 
   static final Map<String, IconData> _iconMap = {
     'restaurant': Icons.restaurant,
@@ -276,21 +281,15 @@ class _CategoryCard extends StatelessWidget {
   }
 
   Color _lightColor(Color base) {
-    return Color.fromARGB(
-      255,
-      255 - ((255 - base.red) ~/ 4),
-      255 - ((255 - base.green) ~/ 4),
-      255 - ((255 - base.blue) ~/ 4),
-    );
+    final hsl = HSLColor.fromColor(base);
+    final lightness = (hsl.lightness + 0.2).clamp(0.0, 1.0);
+    return hsl.withLightness(lightness).toColor();
   }
 
   Color _darkColor(Color base) {
-    return Color.fromARGB(
-      255,
-      (base.red * 7) ~/ 10,
-      (base.green * 7) ~/ 10,
-      (base.blue * 7) ~/ 10,
-    );
+    final hsl = HSLColor.fromColor(base);
+    final lightness = (hsl.lightness - 0.2).clamp(0.0, 1.0);
+    return hsl.withLightness(lightness).toColor();
   }
 
   IconData _getIcon() {
@@ -307,9 +306,7 @@ class _CategoryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.bgPrimary,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: AppColors.borderColor.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppColors.borderColor.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Stack(
@@ -339,11 +336,7 @@ class _CategoryCard extends StatelessWidget {
                     color: lightColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    _getIcon(),
-                    color: darkColor,
-                    size: 28,
-                  ),
+                  child: Icon(_getIcon(), color: darkColor, size: 28),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
@@ -380,7 +373,7 @@ class _AddNewCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
-              color: AppColors.borderColor.withOpacity(0.5),
+              color: AppColors.borderColor.withValues(alpha: 0.5),
               style: BorderStyle.solid,
               width: 2,
             ),

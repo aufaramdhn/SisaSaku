@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/services/notification_service.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
+import 'package:sisasaku/core/utils/date_formatter.dart';
 import 'package:sisasaku/features/bill/domain/entities/bill_entity.dart';
 import 'package:sisasaku/features/bill/presentation/providers/bill_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -25,13 +27,7 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
   bool _isRutin = true;
   bool _isLoading = false;
 
-  final _pengingatOptions = const [
-    'H-1',
-    'H-3',
-    'H-7',
-    'Hari H',
-    'Tidak ada',
-  ];
+  final _pengingatOptions = const ['H-1', 'H-3', 'H-7', 'Hari H', 'Tidak ada'];
 
   static const _uuid = Uuid();
 
@@ -51,9 +47,9 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context)
-                .colorScheme
-                .copyWith(primary: AppColors.primaryColor),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppColors.primaryColor),
           ),
           child: child!,
         );
@@ -67,8 +63,18 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
   String get _formattedDate {
     final hari = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     final bulan = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     return '${hari[_selectedDate.weekday % 7]}, '
         '${_selectedDate.day} ${bulan[_selectedDate.month - 1]} ${_selectedDate.year}';
@@ -130,12 +136,16 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
 
     final now = DateTime.now();
     final waktuPengingat = _calculateWaktuPengingat();
+    final shouldSchedule = _pengingat != 'Tidak ada';
 
     // Determine initial status based on due date
     final BillStatus status;
     if (_selectedDate.isBefore(DateTime(now.year, now.month, now.day))) {
       status = BillStatus.overdue;
-    } else if (_selectedDate.difference(DateTime(now.year, now.month, now.day)).inDays <= 3) {
+    } else if (_selectedDate
+            .difference(DateTime(now.year, now.month, now.day))
+            .inDays <=
+        3) {
       status = BillStatus.pending;
     } else {
       status = BillStatus.upcoming;
@@ -157,7 +167,26 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
 
     try {
       final repository = await ref.read(billRepositoryProvider.future);
-      await repository.addBill(bill);
+      final savedBill = await repository.addBill(bill);
+
+      // Schedule reminder notification if applicable
+      if (shouldSchedule && savedBill.waktuPengingat.isAfter(DateTime.now())) {
+        final localDatasource = await ref.read(
+          billLocalDatasourceProvider.future,
+        );
+        final billModel = await localDatasource.getBillById(savedBill.id);
+        if (billModel != null && billModel.isarId != null) {
+          await NotificationService().scheduleBillReminder(
+            id: billModel.isarId!,
+            title: 'Tagihan Mendatang',
+            body:
+                '${savedBill.nama} - Rp ${CurrencyFormatter.format(savedBill.nominal ?? 0)} jatuh tempo ${DateFormatter.formatDate(savedBill.tanggalJatuhTempo)}',
+            scheduledDate: savedBill.waktuPengingat,
+            payload: savedBill.id,
+          );
+        }
+      }
+
       if (mounted) {
         _showSnackBar('Tagihan berhasil disimpan');
         context.pop();
@@ -174,9 +203,9 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -218,9 +247,7 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -478,7 +505,10 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
             child: DropdownButton<String>(
               value: _pengingat,
               isExpanded: true,
-              icon: const Icon(Icons.expand_more, color: AppColors.textSecondary),
+              icon: const Icon(
+                Icons.expand_more,
+                color: AppColors.textSecondary,
+              ),
               style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w400,
@@ -561,7 +591,9 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : AppColors.textSecondary,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               height: 1.4,
@@ -632,8 +664,10 @@ class _ThousandSeparatorFormatter extends TextInputFormatter {
 
     final text = buffer.toString();
     final offsetDelta = text.length - newValue.text.length;
-    final newOffset = (newValue.selection.end + offsetDelta)
-        .clamp(0, text.length);
+    final newOffset = (newValue.selection.end + offsetDelta).clamp(
+      0,
+      text.length,
+    );
 
     return TextEditingValue(
       text: text,

@@ -7,6 +7,7 @@ import 'package:sisasaku/features/bill/presentation/pages/edit_bill_page.dart';
 import 'package:sisasaku/features/category/presentation/pages/add_category_page.dart';
 import 'package:sisasaku/features/category/presentation/pages/category_page.dart';
 import 'package:sisasaku/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:sisasaku/features/auth/presentation/pages/login_page.dart';
 import 'package:sisasaku/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:sisasaku/features/onboarding/presentation/pages/splash_screen.dart';
 import 'package:sisasaku/features/settings/presentation/pages/cloud_backup_page.dart';
@@ -80,6 +81,10 @@ class AppRouter {
       GoRoute(
         path: cloudBackup,
         builder: (context, state) => const CloudBackupPage(),
+      ),
+      GoRoute(
+        path: login,
+        builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
         path: addTransaction,

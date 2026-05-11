@@ -9,6 +9,7 @@ import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/core/providers/isar_provider.dart';
 import 'package:sisasaku/core/services/dummy_data_service.dart';
+import 'package:sisasaku/features/auth/presentation/providers/auth_providers.dart';
 import 'package:sisasaku/routes/app_router.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -75,6 +76,9 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final isGuest = authState.status == AuthStatus.unauthenticated;
+
     return Scaffold(
       backgroundColor: AppColors.bgSecondary,
       body: Stack(
@@ -133,9 +137,25 @@ class SettingsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildProfileSection(context),
+                  _buildProfileSection(
+                    context,
+                    authState,
+                    isGuest,
+                    () async {
+                      try {
+                        await ref.read(authStateProvider.notifier).signOut();
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Gagal keluar. Coba lagi.'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildWarningCard(),
+                  if (isGuest) _buildWarningCard() else _buildActiveCard(),
                   const SizedBox(height: AppSpacing.xl),
                   _buildMenuGroup(
                     title: 'Preferensi',
@@ -282,7 +302,17 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileSection(BuildContext context) {
+  Widget _buildProfileSection(
+    BuildContext context,
+    AuthState authState,
+    bool isGuest,
+    VoidCallback onSignOut,
+  ) {
+    final user = authState.user;
+    final displayName = user?.name ?? user?.email ?? 'Pengguna';
+    final email = user?.email;
+    final initials = _getInitials(displayName, email);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.bgPrimary,
@@ -307,10 +337,10 @@ class SettingsPage extends ConsumerWidget {
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'AP',
-                    style: TextStyle(
+                    initials,
+                    style: const TextStyle(
                       color: AppColors.primaryColor,
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
@@ -324,8 +354,8 @@ class SettingsPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Andi Pratama',
+                    Text(
+                      displayName,
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -333,6 +363,18 @@ class SettingsPage extends ConsumerWidget {
                         height: 1.3,
                       ),
                     ),
+                    if (email != null && !isGuest) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        email,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w400,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xs),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -343,9 +385,9 @@ class SettingsPage extends ConsumerWidget {
                         color: AppColors.bgTertiary,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
-                      child: const Text(
-                        'Mode Tamu',
-                        style: TextStyle(
+                      child: Text(
+                        isGuest ? 'Mode Tamu' : 'Tersinkron',
+                        style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                           fontSize: 9,
@@ -369,18 +411,18 @@ class SettingsPage extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.cloud_upload_outlined,
                         color: Colors.white,
                         size: 18,
                       ),
-                      SizedBox(width: AppSpacing.sm),
+                      const SizedBox(width: AppSpacing.sm),
                       Text(
-                        'Login & Backup Cloud',
-                        style: TextStyle(
+                        isGuest ? 'Login & Backup Cloud' : 'Kelola Backup Cloud',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -393,9 +435,50 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
           ),
+          if (!isGuest) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onSignOut,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  side: BorderSide(
+                    color: AppColors.borderColor.withValues(alpha: 0.5),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                ),
+                child: const Text(
+                  AppStrings.logout,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _getInitials(String name, String? email) {
+    final cleaned = name.trim();
+    if (cleaned.isNotEmpty) {
+      final parts = cleaned.split(' ').where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return cleaned.substring(0, 1).toUpperCase();
+    }
+    if (email != null && email.isNotEmpty) {
+      return email.substring(0, 1).toUpperCase();
+    }
+    return 'SS';
   }
 
   Widget _buildWarningCard() {
@@ -435,6 +518,56 @@ class SettingsPage extends ConsumerWidget {
                   'Data Anda hanya tersimpan di perangkat ini. Login untuk mencadangkan.',
                   style: TextStyle(
                     color: AppColors.warningDark.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w400,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.successLight,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: const Border(
+          left: BorderSide(color: AppColors.successColor, width: 3),
+        ),
+      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.cloud_done,
+            color: AppColors.successColor,
+            size: 18,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Backup aktif',
+                  style: TextStyle(
+                    color: AppColors.successColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Data Anda tersinkronisasi dengan cloud.',
+                  style: TextStyle(
+                    color: AppColors.successColor.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w400,
                     fontSize: 13,
                     height: 1.5,
