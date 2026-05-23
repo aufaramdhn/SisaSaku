@@ -5,11 +5,20 @@ abstract class TransactionRepository {
   /// Get semua transaksi
   Future<List<TransactionEntity>> getTransactions();
 
+  /// Watch semua transaksi (real-time stream)
+  Stream<List<TransactionEntity>> watchTransactions();
+
   /// Get transaksi by ID
   Future<TransactionEntity?> getTransactionById(String id);
 
   /// Get transaksi dalam range tanggal
   Future<List<TransactionEntity>> getTransactionsByDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  );
+
+  /// Watch transaksi dalam range tanggal (real-time stream)
+  Stream<List<TransactionEntity>> watchTransactionsByDateRange(
     DateTime startDate,
     DateTime endDate,
   );

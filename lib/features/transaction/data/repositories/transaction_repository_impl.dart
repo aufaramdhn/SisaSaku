@@ -136,4 +136,31 @@ class TransactionRepositoryImpl extends TransactionRepository {
       rethrow;
     }
   }
+
+  /// Stream semua transaksi (real-time)
+  @override
+  Stream<List<TransactionEntity>> watchTransactions() {
+    try {
+      return localDatasource.watchTransactions().map(
+        (models) => models.map(_modelToEntity).toList(),
+      );
+    } on DatabaseException {
+      rethrow;
+    }
+  }
+
+  /// Stream transaksi dalam range tanggal (real-time)
+  @override
+  Stream<List<TransactionEntity>> watchTransactionsByDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    try {
+      return localDatasource
+          .watchTransactionsByDateRange(startDate, endDate)
+          .map((models) => models.map(_modelToEntity).toList());
+    } on DatabaseException {
+      rethrow;
+    }
+  }
 }

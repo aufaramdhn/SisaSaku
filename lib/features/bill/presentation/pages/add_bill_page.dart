@@ -10,6 +10,7 @@ import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/core/utils/date_formatter.dart';
 import 'package:sisasaku/features/bill/domain/entities/bill_entity.dart';
 import 'package:sisasaku/features/bill/presentation/providers/bill_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 import 'package:uuid/uuid.dart';
 
 class AddBillPage extends ConsumerStatefulWidget {
@@ -124,13 +125,19 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
   Future<void> _submit() async {
     final nama = _namaController.text.trim();
     if (nama.isEmpty) {
-      _showSnackBar('Nama tagihan harus diisi');
+      _showErrorDialog(
+        title: 'Nama tagihan belum diisi',
+        message: 'Silakan isi nama tagihan terlebih dahulu.',
+      );
       return;
     }
 
     final nominal = CurrencyFormatter.parse(_nominalController.text);
     if (nominal <= 0) {
-      _showSnackBar('Nominal harus lebih dari 0');
+      _showErrorDialog(
+        title: 'Nominal belum valid',
+        message: 'Nominal harus lebih dari 0.',
+      );
       return;
     }
 
@@ -170,30 +177,56 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
       final savedBill = await repository.addBill(bill);
 
       // Schedule reminder notification if applicable
+      var reminderScheduled = false;
       if (shouldSchedule && savedBill.waktuPengingat.isAfter(DateTime.now())) {
-        final localDatasource = await ref.read(
-          billLocalDatasourceProvider.future,
-        );
-        final billModel = await localDatasource.getBillById(savedBill.id);
-        if (billModel != null && billModel.isarId != null) {
-          await NotificationService().scheduleBillReminder(
-            id: billModel.isarId!,
-            title: 'Tagihan Mendatang',
-            body:
-                '${savedBill.nama} - Rp ${CurrencyFormatter.format(savedBill.nominal ?? 0)} jatuh tempo ${DateFormatter.formatDate(savedBill.tanggalJatuhTempo)}',
-            scheduledDate: savedBill.waktuPengingat,
-            payload: savedBill.id,
+        try {
+          final localDatasource = await ref.read(
+            billLocalDatasourceProvider.future,
           );
+
+          // Fetch the bill model to get the Isar-assigned ID for notifications.
+          // Retry once after a short delay if the first fetch returns null
+          // (guards against a potential race condition with Isar indexing).
+          var billModel = await localDatasource.getBillById(savedBill.id);
+          if (billModel == null || billModel.isarId == null) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            billModel = await localDatasource.getBillById(savedBill.id);
+          }
+
+          if (billModel != null && billModel.isarId != null) {
+            await NotificationService().scheduleBillReminder(
+              id: billModel.isarId!,
+              title: 'Tagihan Mendatang',
+              body:
+                  '${savedBill.nama} - Rp ${CurrencyFormatter.format(savedBill.nominal ?? 0)} jatuh tempo ${DateFormatter.formatDate(savedBill.tanggalJatuhTempo)}',
+              scheduledDate: savedBill.waktuPengingat,
+              payload: savedBill.id,
+            );
+            reminderScheduled = true;
+          }
+        } catch (_) {
+          reminderScheduled = false;
         }
       }
 
       if (mounted) {
-        _showSnackBar('Tagihan berhasil disimpan');
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Tagihan berhasil disimpan',
+          message: reminderScheduled
+              ? 'Pengingat tagihan sudah ditambahkan.'
+              : 'Tagihan tersimpan. Pengingat sistem tidak aktif di perangkat ini.',
+        );
+      }
+      if (mounted) {
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Gagal menyimpan tagihan: \$e');
+        _showErrorDialog(
+          title: 'Gagal menyimpan tagihan',
+          message: e.toString(),
+        );
       }
     } finally {
       if (mounted) {
@@ -202,16 +235,19 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
+  void _showErrorDialog({required String title, required String message}) {
+    FeedbackDialog.showError<void>(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      title: title,
+      message: message,
+      actionLabel: 'Oke',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -220,29 +256,9 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textSecondary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Text(
-                    'Tambah Tagihan',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              child: const AppPageHeader(
+                title: 'Tambah Tagihan',
+                showBackButton: true,
               ),
             ),
             Expanded(
@@ -293,191 +309,33 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
     TextInputType keyboardType = TextInputType.text,
     bool isOptional = false,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                height: 1.4,
-              ),
-            ),
-            if (isOptional) ...[
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                '(opsional)',
-                style: TextStyle(
-                  color: AppColors.textSecondary.withValues(alpha: 0.6),
-                  fontWeight: FontWeight.w400,
-                  fontSize: 11,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-            height: 1.4,
-          ),
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
-            border: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            enabledBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.primaryColor),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            hintText: hint,
-            hintStyle: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
+    return AppModernTextField(
+      controller: controller,
+      label: label,
+      optionalText: isOptional ? '(opsional)' : null,
+      hint: hint,
+      prefixIcon: icon,
+      keyboardType: keyboardType,
     );
   }
 
   Widget _buildNominalField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nominal',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Text(
-              'Rp',
-              style: TextStyle(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 28,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: TextField(
-                controller: _nominalController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 28,
-                  height: 1.2,
-                ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  hintText: '0',
-                  hintStyle: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 28,
-                  ),
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  const _ThousandSeparatorFormatter(),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const Divider(color: AppColors.borderColor, height: 1),
+    return AppMoneyField(
+      controller: _nominalController,
+      label: 'Nominal',
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        const _ThousandSeparatorFormatter(),
       ],
     );
   }
 
   Widget _buildDateField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Jatuh Tempo',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        GestureDetector(
-          onTap: _pickDate,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.borderColor),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _formattedDate,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textSecondary,
-                  size: 18,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return AppSelectableField(
+      label: 'Jatuh Tempo',
+      value: _formattedDate,
+      icon: Icons.calendar_today_outlined,
+      onTap: _pickDate,
     );
   }
 
@@ -485,10 +343,10 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Pengingat',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -498,19 +356,19 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderColor),
+            border: Border.all(color: AppColors.borderColorOf(context)),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _pengingat,
               isExpanded: true,
-              icon: const Icon(
+              icon: Icon(
                 Icons.expand_more,
-                color: AppColors.textSecondary,
+                color: AppColors.textSecondaryOf(context),
               ),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                color: AppColors.textPrimaryOf(context),
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
               ),
@@ -534,10 +392,10 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Tipe Tagihan',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -547,7 +405,7 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppColors.bgTertiary,
+            color: AppColors.bgTertiaryOf(context),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -579,7 +437,7 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
+      color: isActive ? AppColors.bgPrimaryOf(context) : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       elevation: isActive ? 1 : 0,
       child: InkWell(
@@ -593,7 +451,7 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
             style: TextStyle(
               color: isActive
                   ? AppColors.primaryColor
-                  : AppColors.textSecondary,
+                  : AppColors.textSecondaryOf(context),
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               height: 1.4,
@@ -609,7 +467,7 @@ class _AddBillPageState extends ConsumerState<AddBillPage> {
       width: double.infinity,
       height: 52,
       child: Material(
-        color: _isLoading ? AppColors.textSecondary : AppColors.primaryColor,
+        color: _isLoading ? AppColors.textSecondaryOf(context) : AppColors.primaryColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           onTap: _isLoading ? null : _submit,

@@ -6,6 +6,7 @@ import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/features/auth/presentation/providers/auth_providers.dart';
 import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class LoginPage extends ConsumerWidget {
   const LoginPage({super.key});
@@ -16,7 +17,7 @@ class LoginPage extends ConsumerWidget {
     final isGuest = authState.status == AuthStatus.unauthenticated;
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.bgSecondaryOf(context),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -31,17 +32,17 @@ class LoginPage extends ConsumerWidget {
               Text(
                 AppStrings.login,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimaryOf(context),
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'Masuk untuk mengaktifkan sinkronisasi cloud dan backup data.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
+                  color: AppColors.textSecondaryOf(context),
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: AppSpacing.xl2),
               SizedBox(
@@ -55,10 +56,11 @@ class LoginPage extends ConsumerWidget {
                                 .signInWithGoogle();
                           } catch (_) {
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Login gagal. Coba lagi.'),
-                              ),
+                            await FeedbackDialog.showError<void>(
+                              context,
+                              title: 'Login gagal',
+                              message: 'Coba lagi beberapa saat lagi.',
+                              actionLabel: 'Oke',
                             );
                           }
                         }
@@ -73,10 +75,10 @@ class LoginPage extends ConsumerWidget {
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: AppColors.bgPrimary,
-                    foregroundColor: AppColors.textPrimary,
+                    backgroundColor: AppColors.bgPrimaryOf(context),
+                    foregroundColor: AppColors.textPrimaryOf(context),
                     side: BorderSide(
-                      color: AppColors.borderColor.withValues(alpha: 0.5),
+                      color: AppColors.borderColorOf(context).withValues(alpha: 0.5),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -112,9 +114,9 @@ class LoginPage extends ConsumerWidget {
                 'Dengan masuk, Anda menyetujui kebijakan privasi dan syarat layanan.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
+                  color: AppColors.textSecondaryOf(context),
+                  height: 1.4,
+                ),
               ),
             ],
           ),

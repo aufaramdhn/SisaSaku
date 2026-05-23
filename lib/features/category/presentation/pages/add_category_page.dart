@@ -6,6 +6,7 @@ import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/features/category/domain/entities/category_entity.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 import 'package:uuid/uuid.dart';
 
 class AddCategoryPage extends ConsumerStatefulWidget {
@@ -64,15 +65,24 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
   Future<void> _submit() async {
     final nama = _namaController.text.trim();
     if (nama.isEmpty) {
-      _showSnackBar('Nama kategori harus diisi');
+      _showErrorDialog(
+        title: 'Nama kategori belum diisi',
+        message: 'Silakan isi nama kategori terlebih dahulu.',
+      );
       return;
     }
     if (_selectedIcon == null) {
-      _showSnackBar('Pilih ikon kategori');
+      _showErrorDialog(
+        title: 'Ikon belum dipilih',
+        message: 'Silakan pilih ikon kategori.',
+      );
       return;
     }
     if (_selectedColor == null) {
-      _showSnackBar('Pilih warna kategori');
+      _showErrorDialog(
+        title: 'Warna belum dipilih',
+        message: 'Silakan pilih warna kategori.',
+      );
       return;
     }
 
@@ -92,12 +102,21 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
       final repository = await ref.read(categoryRepositoryProvider.future);
       await repository.addCategory(category);
       if (mounted) {
-        _showSnackBar('Kategori berhasil disimpan');
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Kategori berhasil disimpan',
+          message: 'Kategori baru sudah bisa dipakai.',
+        );
+      }
+      if (mounted) {
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Gagal menyimpan kategori: \$e');
+        _showErrorDialog(
+          title: 'Gagal menyimpan kategori',
+          message: e.toString(),
+        );
       }
     } finally {
       if (mounted) {
@@ -106,16 +125,19 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  void _showErrorDialog({required String title, required String message}) {
+    FeedbackDialog.showError<void>(
+      context,
+      title: title,
+      message: message,
+      actionLabel: 'Oke',
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -124,36 +146,14 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textSecondary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Text(
-                    'Tambah Kategori',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              child: const AppPageHeader(
+                title: 'Tambah Kategori',
+                showBackButton: true,
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -183,54 +183,11 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
   }
 
   Widget _buildNamaField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nama Kategori',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: _namaController,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-            height: 1.4,
-          ),
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.label_outline, color: AppColors.textSecondary, size: 20),
-            border: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            enabledBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.primaryColor),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            hintText: 'Contoh: Makanan, Transportasi',
-            hintStyle: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
+    return AppModernTextField(
+      controller: _namaController,
+      label: 'Nama Kategori',
+      hint: 'Contoh: Makanan, Transportasi',
+      prefixIcon: Icons.label_outline,
     );
   }
 
@@ -238,10 +195,10 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Ikon',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -260,10 +217,14 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
                 width: 64,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primaryLight : AppColors.bgSecondary,
+                  color: isSelected
+                      ? AppColors.primaryLight
+                      : AppColors.bgSecondaryOf(context),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(
-                    color: isSelected ? AppColors.primaryColor : AppColors.borderColor,
+                    color: isSelected
+                        ? AppColors.primaryColor
+                        : AppColors.borderColorOf(context),
                     width: isSelected ? 2 : 1,
                   ),
                 ),
@@ -272,15 +233,21 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
                   children: [
                     Icon(
                       iconData,
-                      color: isSelected ? AppColors.primaryColor : AppColors.textSecondary,
+                      color: isSelected
+                          ? AppColors.primaryColor
+                          : AppColors.textSecondaryOf(context),
                       size: 24,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       iconOption['label']!,
                       style: TextStyle(
-                        color: isSelected ? AppColors.primaryColor : AppColors.textSecondary,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected
+                            ? AppColors.primaryColor
+                            : AppColors.textSecondaryOf(context),
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                         fontSize: 10,
                         height: 1.2,
                       ),
@@ -302,10 +269,10 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Warna',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -327,7 +294,9 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
                   color: color,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected ? AppColors.textPrimary : Colors.transparent,
+                    color: isSelected
+                        ? AppColors.textPrimaryOf(context)
+                        : Colors.transparent,
                     width: 3,
                   ),
                 ),
@@ -347,7 +316,7 @@ class _AddCategoryPageState extends ConsumerState<AddCategoryPage> {
       width: double.infinity,
       height: 52,
       child: Material(
-        color: _isLoading ? AppColors.textSecondary : AppColors.primaryColor,
+        color: _isLoading ? AppColors.textSecondaryOf(context) : AppColors.primaryColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           onTap: _isLoading ? null : _submit,

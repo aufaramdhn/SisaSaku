@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,9 +9,16 @@ import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/core/providers/isar_provider.dart';
+import 'package:sisasaku/core/providers/theme_provider.dart';
 import 'package:sisasaku/core/services/dummy_data_service.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/features/auth/presentation/providers/auth_providers.dart';
+import 'package:sisasaku/features/security/presentation/pages/pin_setup_page.dart';
+import 'package:sisasaku/features/security/presentation/pages/pin_verify_page.dart';
+import 'package:sisasaku/features/security/presentation/providers/security_provider.dart';
+import 'package:sisasaku/features/settings/presentation/providers/profile_provider.dart';
 import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -20,55 +28,52 @@ class SettingsPage extends ConsumerWidget {
       final isar = ref.read(isarProvider);
       await DummyDataService.generateSampleData(isar);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data dummy berhasil dibuat')),
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Data dummy berhasil dibuat',
+          message: 'Data contoh sudah ditambahkan ke aplikasi.',
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal membuat data dummy: $e')),
+        await FeedbackDialog.showError<void>(
+          context,
+          title: 'Gagal membuat data dummy',
+          message: e.toString(),
+          actionLabel: 'Oke',
         );
       }
     }
   }
 
   Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hapus Semua Data'),
-        content: const Text(
+    final confirmed = await FeedbackDialog.showConfirm(
+      context,
+      title: 'Hapus Semua Data',
+      message:
           'Semua data transaksi, tagihan, dan kategori akan dihapus. Tindakan ini tidak dapat dibatalkan.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.dangerColor),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+      actionLabel: 'Hapus',
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       final isar = ref.read(isarProvider);
       await DummyDataService.clearAllData(isar);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Semua data berhasil dihapus')),
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Semua data berhasil dihapus',
+          message: 'Aplikasi sudah kembali ke kondisi kosong.',
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus data: $e')),
+        await FeedbackDialog.showError<void>(
+          context,
+          title: 'Gagal menghapus data',
+          message: e.toString(),
+          actionLabel: 'Oke',
         );
       }
     }
@@ -77,10 +82,12 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final profileAsync = ref.watch(profileViewProvider);
+    final themeMode = ref.watch(themeModeProvider);
     final isGuest = authState.status == AuthStatus.unauthenticated;
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Stack(
         children: [
           Positioned(
@@ -93,7 +100,7 @@ class SettingsPage extends ConsumerWidget {
                 height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withValues(alpha: 0.4),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.4),
                 ),
               ),
             ),
@@ -129,80 +136,92 @@ class SettingsPage extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     AppStrings.pengaturan,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontWeight: FontWeight.w800,
                       fontSize: 28,
                       height: 1.1,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildProfileSection(
-                    context,
-                    authState,
-                    isGuest,
-                    () async {
-                      try {
-                        await ref.read(authStateProvider.notifier).signOut();
-                      } catch (_) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Gagal keluar. Coba lagi.'),
-                          ),
-                        );
-                      }
-                    },
+                  profileAsync.when(
+                    loading: () => const _ProfileSectionSkeleton(),
+                    error: (_, _) => const _ProfileSectionSkeleton(),
+                    data: (profile) => _buildProfileSection(
+                      context,
+                      profile,
+                      () async {
+                        try {
+                          await ref.read(authStateProvider.notifier).signOut();
+                          ref.read(profileRefreshProvider.notifier).state++;
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          await FeedbackDialog.showError<void>(
+                            context,
+                            title: 'Gagal keluar',
+                            message: 'Coba lagi beberapa saat lagi.',
+                            actionLabel: 'Oke',
+                          );
+                        }
+                      },
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   if (isGuest) _buildWarningCard() else _buildActiveCard(),
                   const SizedBox(height: AppSpacing.xl),
                   _buildMenuGroup(
-                    title: 'Preferensi',
+                    context,
+                    title: 'Profil',
                     items: [
                       _MenuItem(
-                        icon: Icons.category_outlined,
-                        iconBgColor: AppColors.surfaceVariant,
-                        label: 'Kelola Kategori',
-                        onTap: () => context.push(AppRouter.category),
-                      ),
-                      _MenuItem(
-                        icon: Icons.account_balance_wallet_outlined,
-                        iconBgColor: AppColors.surfaceVariant,
-                        label: 'Anggaran',
-                        onTap: () => context.push(AppRouter.budget),
-                      ),
-                      _MenuItem(
-                        icon: Icons.handshake_outlined,
-                        iconBgColor: AppColors.surfaceVariant,
-                        label: 'Hutang & Piutang',
-                        onTap: () => context.push(AppRouter.debt),
-                      ),
-                      _MenuItem(
-                        icon: Icons.notifications_active_outlined,
-                        iconBgColor: AppColors.surfaceVariant,
-                        label: 'Notifikasi',
-                        onTap: () {},
-                      ),
-                      _MenuItem(
-                        icon: Icons.palette_outlined,
-                        iconBgColor: AppColors.surfaceVariant,
-                        label: 'Tema',
-                        trailing: const Text(
-                          'Terang',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w400,
-                            fontSize: 13,
-                            height: 1.5,
-                          ),
-                        ),
-                        onTap: () {},
+                        icon: Icons.person_outline,
+                        iconBgColor: AppColors.primaryLight,
+                        iconColor: AppColors.primaryColor,
+                        label: isGuest ? 'Profil Lokal' : 'Edit Profil',
+                        onTap: () => context.push(AppRouter.editProfile),
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _buildMenuGroup(
+                    context,
+                    title: 'Preferensi',
+                    items: [
+                      _MenuItem(
+                        icon: Icons.category_outlined,
+                        iconBgColor: context.colors.surfaceVariant,
+                        label: 'Kelola Kategori',
+                        onTap: () => context.push(AppRouter.category),
+                      ),
+                      _MenuItem(
+                        icon: Icons.notifications_active_outlined,
+                        iconBgColor: context.colors.surfaceVariant,
+                        iconColor: null,
+                        label: 'Notifikasi',
+                        onTap: () => context.push(AppRouter.notifications),
+                      ),
+                      _MenuItem(
+                        icon: Icons.palette_outlined,
+                        iconBgColor: context.colors.surfaceVariant,
+                        label: 'Tema',
+                        trailing: Text(
+                          _themeModeLabel(themeMode),
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontWeight: FontWeight.w400,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
+                        onTap: () => _showThemePicker(context, ref, themeMode),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildSecuritySection(context, ref),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildMenuGroup(
+                    context,
                     title: 'Data & Ekspor',
                     items: [
                       _MenuItem(
@@ -224,6 +243,7 @@ class SettingsPage extends ConsumerWidget {
                   if (kDebugMode) ...[
                     const SizedBox(height: AppSpacing.xl),
                     _buildMenuGroup(
+                      context,
                       title: 'Developer',
                       items: [
                         _MenuItem(
@@ -244,23 +264,23 @@ class SettingsPage extends ConsumerWidget {
                     ),
                   ],
                   const SizedBox(height: AppSpacing.xl2),
-                  const Center(
+                  Center(
                     child: Column(
                       children: [
                         Text(
                           'SisaSaku',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
+                            color: AppColors.textSecondaryOf(context),
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                             height: 1.3,
                           ),
                         ),
-                        SizedBox(height: AppSpacing.xs),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           'v1.0.0',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
+                            color: AppColors.textSecondaryOf(context),
                             fontWeight: FontWeight.w400,
                             fontSize: 11,
                             height: 1.4,
@@ -292,10 +312,10 @@ class SettingsPage extends ConsumerWidget {
               color: AppColors.primaryColor,
             ),
           ),
-          const Icon(
-            Icons.notifications_none_outlined,
-            color: AppColors.textSecondary,
-            size: 22,
+          AppHeaderIconButton(
+            icon: Icons.notifications_none_outlined,
+            onPressed: () => context.push(AppRouter.notifications),
+            color: context.colors.textSecondary,
           ),
         ],
       ),
@@ -304,18 +324,12 @@ class SettingsPage extends ConsumerWidget {
 
   Widget _buildProfileSection(
     BuildContext context,
-    AuthState authState,
-    bool isGuest,
+    ProfileViewData profile,
     VoidCallback onSignOut,
   ) {
-    final user = authState.user;
-    final displayName = user?.name ?? user?.email ?? 'Pengguna';
-    final email = user?.email;
-    final initials = _getInitials(displayName, email);
-
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: context.colors.bgPrimary,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: const [
           BoxShadow(
@@ -330,24 +344,12 @@ class SettingsPage extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: const TextStyle(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
+              _SettingsProfileAvatar(
+                initials: profile.initials,
+                avatarPath: profile.avatarPath,
+                avatarUrl: profile.avatarPath == null
+                    ? profile.avatarUrl
+                    : null,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -355,20 +357,20 @@ class SettingsPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      displayName,
+                      profile.displayName,
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: context.colors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
                         height: 1.3,
                       ),
                     ),
-                    if (email != null && !isGuest) ...[
+                    if (profile.email != null && !profile.isGuest) ...[
                       const SizedBox(height: 2),
                       Text(
-                        email,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        profile.email!,
+                        style: TextStyle(
+                          color: context.colors.textSecondary,
                           fontWeight: FontWeight.w400,
                           fontSize: 12,
                           height: 1.3,
@@ -382,13 +384,13 @@ class SettingsPage extends ConsumerWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.bgTertiary,
+                        color: context.colors.bgTertiary,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                       child: Text(
-                        isGuest ? 'Mode Tamu' : 'Tersinkron',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        profile.statusLabel,
+                        style: TextStyle(
+                          color: context.colors.textSecondary,
                           fontWeight: FontWeight.w500,
                           fontSize: 9,
                           height: 1.3,
@@ -396,6 +398,14 @@ class SettingsPage extends ConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => context.push(AppRouter.editProfile),
+                icon: const Icon(Icons.edit_outlined),
+                color: context.colors.textSecondary,
+                style: IconButton.styleFrom(
+                  backgroundColor: context.colors.bgSecondary,
                 ),
               ),
             ],
@@ -421,7 +431,7 @@ class SettingsPage extends ConsumerWidget {
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Text(
-                        isGuest ? 'Login & Backup Cloud' : 'Kelola Backup Cloud',
+                        profile.backupLabel,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -435,16 +445,16 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
           ),
-          if (!isGuest) ...[
+          if (!profile.isGuest) ...[
             const SizedBox(height: AppSpacing.sm),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: onSignOut,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
+                  foregroundColor: context.colors.textSecondary,
                   side: BorderSide(
-                    color: AppColors.borderColor.withValues(alpha: 0.5),
+                    color: context.colors.borderColor.withValues(alpha: 0.5),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.full),
@@ -466,21 +476,6 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  String _getInitials(String name, String? email) {
-    final cleaned = name.trim();
-    if (cleaned.isNotEmpty) {
-      final parts = cleaned.split(' ').where((p) => p.isNotEmpty).toList();
-      if (parts.length >= 2) {
-        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-      }
-      return cleaned.substring(0, 1).toUpperCase();
-    }
-    if (email != null && email.isNotEmpty) {
-      return email.substring(0, 1).toUpperCase();
-    }
-    return 'SS';
-  }
-
   Widget _buildWarningCard() {
     return Container(
       decoration: BoxDecoration(
@@ -494,11 +489,7 @@ class SettingsPage extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.cloud_off,
-            color: AppColors.warningDark,
-            size: 18,
-          ),
+          const Icon(Icons.cloud_off, color: AppColors.warningDark, size: 18),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -544,11 +535,7 @@ class SettingsPage extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.cloud_done,
-            color: AppColors.successColor,
-            size: 18,
-          ),
+          const Icon(Icons.cloud_done, color: AppColors.successColor, size: 18),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -581,7 +568,252 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuGroup({
+  Widget _buildSecuritySection(BuildContext context, WidgetRef ref) {
+    final securityState = ref.watch(securityProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            left: AppSpacing.sm,
+            bottom: AppSpacing.sm,
+          ),
+          child: Text(
+            'KEAMANAN',
+            style: TextStyle(
+              color: context.colors.textSecondary,
+              fontWeight: FontWeight.w400,
+              fontSize: 11,
+              height: 1.4,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: context.colors.bgPrimary,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Column(
+              children: [
+                // Kunci PIN toggle
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _handlePinToggle(context, ref, securityState.pinEnabled),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.md,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryLight,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.lock_outline,
+                              color: AppColors.primaryColor,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              'Kunci PIN',
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                          Switch(
+                            value: securityState.pinEnabled,
+                            onChanged: (value) =>
+                                _handlePinToggle(context, ref, securityState.pinEnabled),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Divider(height: 1, indent: 56, color: context.colors.borderColor),
+                // Biometrik toggle
+                Opacity(
+                  opacity: securityState.pinEnabled ? 1.0 : 0.5,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: securityState.pinEnabled
+                          ? () => _handleBiometricToggle(context, ref, securityState.biometricEnabled)
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.md,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: context.colors.surfaceVariant,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.fingerprint,
+                                color: context.colors.textSecondary,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Text(
+                                'Biometrik',
+                                style: TextStyle(
+                                  color: context.colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: securityState.biometricEnabled,
+                              onChanged: securityState.pinEnabled
+                                  ? (value) => _handleBiometricToggle(
+                                      context, ref, securityState.biometricEnabled)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Ubah PIN (visible only when PIN is enabled)
+                if (securityState.pinEnabled) ...[
+                  Divider(height: 1, indent: 56, color: context.colors.borderColor),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _handleChangePin(context, ref),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.md,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: context.colors.surfaceVariant,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.pin_outlined,
+                                color: context.colors.textSecondary,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Text(
+                                'Ubah PIN',
+                                style: TextStyle(
+                                  color: context.colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right,
+                              color: context.colors.textSecondary,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handlePinToggle(BuildContext context, WidgetRef ref, bool currentlyEnabled) async {
+    if (!currentlyEnabled) {
+      // Enable PIN → navigate to PinSetupPage
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const PinSetupPage()),
+      );
+    } else {
+      // Disable PIN → verify current PIN first
+      final verified = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const PinVerifyPage()),
+      );
+      if (verified == true) {
+        await ref.read(securityProvider.notifier).clearPinStateAfterVerification();
+      }
+    }
+  }
+
+  Future<void> _handleBiometricToggle(BuildContext context, WidgetRef ref, bool currentlyEnabled) async {
+    if (!currentlyEnabled) {
+      final success = await ref.read(securityProvider.notifier).enableBiometric();
+      if (!success && context.mounted) {
+        await FeedbackDialog.showError<void>(
+          context,
+          title: 'Biometrik tidak tersedia',
+          message: 'Biometrik tidak tersedia di perangkat ini.',
+          actionLabel: 'Oke',
+        );
+      }
+    } else {
+      await ref.read(securityProvider.notifier).disableBiometric();
+    }
+  }
+
+  Future<void> _handleChangePin(BuildContext context, WidgetRef ref) async {
+    // First verify current PIN
+    final verified = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const PinVerifyPage()),
+    );
+    if (verified == true && context.mounted) {
+      // Then navigate to PIN setup for new PIN
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const PinSetupPage()),
+      );
+    }
+  }
+
+  Widget _buildMenuGroup(
+    BuildContext context, {
     required String title,
     required List<_MenuItem> items,
   }) {
@@ -595,8 +827,8 @@ class SettingsPage extends ConsumerWidget {
           ),
           child: Text(
             title.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+            style: TextStyle(
+              color: context.colors.textSecondary,
               fontWeight: FontWeight.w400,
               fontSize: 11,
               height: 1.4,
@@ -606,7 +838,7 @@ class SettingsPage extends ConsumerWidget {
         ),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.bgPrimary,
+            color: context.colors.bgPrimary,
             borderRadius: BorderRadius.circular(AppRadius.lg),
             boxShadow: const [
               BoxShadow(
@@ -621,10 +853,10 @@ class SettingsPage extends ConsumerWidget {
             child: Column(
               children: List.generate(items.length * 2 - 1, (index) {
                 if (index.isOdd) {
-                  return const Divider(
+                  return Divider(
                     height: 1,
                     indent: 56,
-                    color: AppColors.borderColor,
+                    color: context.colors.borderColor,
                   );
                 }
                 final item = items[index ~/ 2];
@@ -648,7 +880,7 @@ class SettingsPage extends ConsumerWidget {
                             ),
                             child: Icon(
                               item.icon,
-                              color: item.iconColor ?? AppColors.textSecondary,
+                              color: item.iconColor ?? context.colors.textSecondary,
                               size: 18,
                             ),
                           ),
@@ -656,8 +888,8 @@ class SettingsPage extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               item.label,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                                 height: 1.4,
@@ -665,9 +897,9 @@ class SettingsPage extends ConsumerWidget {
                             ),
                           ),
                           item.trailing ??
-                              const Icon(
+                              Icon(
                                 Icons.chevron_right,
-                                color: AppColors.textSecondary,
+                                color: context.colors.textSecondary,
                                 size: 20,
                               ),
                         ],
@@ -681,6 +913,197 @@ class SettingsPage extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _showThemePicker(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode currentMode,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.colors.bgPrimary,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.colors.borderColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Pilih Tema',
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Tema akan langsung diterapkan ke seluruh aplikasi.',
+                  style: TextStyle(
+                    color: context.colors.textSecondary,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _ThemeOption(
+                  title: 'Terang',
+                  subtitle: 'Tampilan cerah untuk penggunaan harian',
+                  icon: Icons.light_mode_outlined,
+                  selected: currentMode == ThemeMode.light,
+                  onTap: () async {
+                    await ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(ThemeMode.light);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _ThemeOption(
+                  title: 'Gelap',
+                  subtitle: 'Lebih nyaman untuk malam hari',
+                  icon: Icons.dark_mode_outlined,
+                  selected: currentMode == ThemeMode.dark,
+                  onTap: () async {
+                    await ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(ThemeMode.dark);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _ThemeOption(
+                  title: 'Sistem',
+                  subtitle: 'Mengikuti pengaturan perangkat',
+                  icon: Icons.phone_android_outlined,
+                  selected: currentMode == ThemeMode.system,
+                  onTap: () async {
+                    await ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(ThemeMode.system);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _themeModeLabel(ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.dark => 'Gelap',
+      ThemeMode.system => 'Sistem',
+      ThemeMode.light => 'Terang',
+    };
+  }
+}
+
+class _ProfileSectionSkeleton extends StatelessWidget {
+  const _ProfileSectionSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 148,
+      decoration: BoxDecoration(
+        color: context.colors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      alignment: Alignment.center,
+      child: const CircularProgressIndicator(),
+    );
+  }
+}
+
+class _SettingsProfileAvatar extends StatelessWidget {
+  final String initials;
+  final String? avatarPath;
+  final String? avatarUrl;
+
+  const _SettingsProfileAvatar({
+    required this.initials,
+    required this.avatarPath,
+    required this.avatarUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageProvider = _buildImageProvider();
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: const BoxDecoration(
+        color: AppColors.primaryLight,
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: imageProvider == null
+            ? Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    height: 1.2,
+                  ),
+                ),
+              )
+            : Image(
+                image: imageProvider,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: AppColors.primaryColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        height: 1.2,
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
+  ImageProvider<Object>? _buildImageProvider() {
+    if (avatarPath != null && avatarPath!.isNotEmpty) {
+      return FileImage(File(avatarPath!));
+    }
+    if (avatarUrl != null && avatarUrl!.isNotEmpty) {
+      return NetworkImage(avatarUrl!);
+    }
+    return null;
   }
 }
 
@@ -700,4 +1123,95 @@ class _MenuItem {
     this.trailing,
     required this.onTap,
   });
+}
+
+class _ThemeOption extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThemeOption({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: selected ? AppColors.primaryColor : context.colors.borderColor,
+              width: selected ? 1.5 : 1,
+            ),
+            color: selected
+                ? AppColors.decorativeBlurOf(context, alpha: 0.45)
+                : Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: context.colors.surfaceVariant,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: selected
+                      ? AppColors.primaryColor
+                      : context.colors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off_outlined,
+                color: selected
+                    ? AppColors.primaryColor
+                    : context.colors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

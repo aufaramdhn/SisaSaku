@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 import 'package:isar/isar.dart';
 import 'package:uuid/uuid.dart';
@@ -74,6 +75,9 @@ class DummyDataService {
 
   /// Generate sample data untuk development/testing
   static Future<void> generateSampleData(Isar isar) async {
+    if (kReleaseMode) {
+      throw StateError('DummyDataService is disabled in release builds.');
+    }
     // 1. Generate 8 categories
     final categories = _categoryPresets.map((preset) {
       return CategoryModel(
@@ -93,14 +97,26 @@ class DummyDataService {
 
     // 2. Generate 30 transactions with random dates in last 30 days
     final expenseCategories = categories
-        .where((c) =>
-            !['gaji', 'bonus', 'investasi', 'hadiah', 'penjualan']
-                .contains(c.nama?.toLowerCase()))
+        .where(
+          (c) => ![
+            'gaji',
+            'bonus',
+            'investasi',
+            'hadiah',
+            'penjualan',
+          ].contains(c.nama?.toLowerCase()),
+        )
         .toList();
     final incomeCategories = categories
-        .where((c) =>
-            ['gaji', 'bonus', 'investasi', 'hadiah', 'penjualan']
-                .contains(c.nama?.toLowerCase()))
+        .where(
+          (c) => [
+            'gaji',
+            'bonus',
+            'investasi',
+            'hadiah',
+            'penjualan',
+          ].contains(c.nama?.toLowerCase()),
+        )
         .toList();
 
     final now = DateTime.now();
@@ -117,23 +133,31 @@ class DummyDataService {
 
       if (isExpense) {
         nominal = (50000 + _random.nextInt(450001)).toDouble(); // 50k - 500k
-        idKategori = expenseCategories[_random.nextInt(expenseCategories.length)].id!;
-        deskripsi = _expenseDescriptions[_random.nextInt(_expenseDescriptions.length)];
+        idKategori =
+            expenseCategories[_random.nextInt(expenseCategories.length)].id!;
+        deskripsi =
+            _expenseDescriptions[_random.nextInt(_expenseDescriptions.length)];
       } else {
         nominal = (1000000 + _random.nextInt(4000001)).toDouble(); // 1M - 5M
-        idKategori = incomeCategories[_random.nextInt(incomeCategories.length)].id!;
-        deskripsi = _incomeDescriptions[_random.nextInt(_incomeDescriptions.length)];
+        idKategori =
+            incomeCategories[_random.nextInt(incomeCategories.length)].id!;
+        deskripsi =
+            _incomeDescriptions[_random.nextInt(_incomeDescriptions.length)];
       }
 
-      transactions.add(TransactionModel(
-        id: _uuid.v4(),
-        nominal: nominal,
-        jenis: isExpense ? TransactionType.expense.label : TransactionType.income.label,
-        tanggal: tanggal,
-        idKategori: idKategori,
-        deskripsi: deskripsi,
-        syncStatus: false,
-      ));
+      transactions.add(
+        TransactionModel(
+          id: _uuid.v4(),
+          nominal: nominal,
+          jenis: isExpense
+              ? TransactionType.expense.label
+              : TransactionType.income.label,
+          tanggal: tanggal,
+          idKategori: idKategori,
+          deskripsi: deskripsi,
+          syncStatus: false,
+        ),
+      );
     }
 
     await isar.writeTxn(() async {
@@ -151,29 +175,29 @@ class DummyDataService {
     for (int i = 0; i < 5; i++) {
       final day = 5 + _random.nextInt(daysInMonth - 4); // day 5 to end of month
       final tanggalJatuhTempo = DateTime(currentYear, currentMonth, day);
-      final waktuPengingat = DateTime(
-        currentYear,
-        currentMonth,
-        day - 1,
-        8,
-        0,
-      );
+      final waktuPengingat = DateTime(currentYear, currentMonth, day - 1, 8, 0);
 
-      final status = tanggalJatuhTempo.isBefore(DateTime(now.year, now.month, now.day))
+      final status =
+          tanggalJatuhTempo.isBefore(DateTime(now.year, now.month, now.day))
           ? BillStatus.overdue.label
-          : (tanggalJatuhTempo.difference(DateTime(now.year, now.month, now.day)).inDays <= 3
-              ? BillStatus.pending.label
-              : BillStatus.upcoming.label);
+          : (tanggalJatuhTempo
+                        .difference(DateTime(now.year, now.month, now.day))
+                        .inDays <=
+                    3
+                ? BillStatus.pending.label
+                : BillStatus.upcoming.label);
 
-      bills.add(BillModel(
-        id: _uuid.v4(),
-        nama: _billNames[_random.nextInt(_billNames.length)],
-        nominal: (100000 + _random.nextInt(900001)).toDouble(), // 100k - 1M
-        tanggalJatuhTempo: tanggalJatuhTempo,
-        waktuPengingat: waktuPengingat,
-        status: status,
-        syncStatus: false,
-      ));
+      bills.add(
+        BillModel(
+          id: _uuid.v4(),
+          nama: _billNames[_random.nextInt(_billNames.length)],
+          nominal: (100000 + _random.nextInt(900001)).toDouble(), // 100k - 1M
+          tanggalJatuhTempo: tanggalJatuhTempo,
+          waktuPengingat: waktuPengingat,
+          status: status,
+          syncStatus: false,
+        ),
+      );
     }
 
     await isar.writeTxn(() async {
@@ -185,6 +209,9 @@ class DummyDataService {
 
   /// Clear all data dari ketiga collections
   static Future<void> clearAllData(Isar isar) async {
+    if (kReleaseMode) {
+      throw StateError('DummyDataService is disabled in release builds.');
+    }
     await isar.writeTxn(() async {
       await isar.categoryModels.clear();
       await isar.transactionModels.clear();

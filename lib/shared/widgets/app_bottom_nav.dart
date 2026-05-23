@@ -22,10 +22,12 @@ class AppBottomNav extends StatelessWidget {
       children: [
         Container(
           height: 64 + bottomInset,
-          decoration: const BoxDecoration(
-            color: AppColors.bgPrimary,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-            boxShadow: [
+          decoration: BoxDecoration(
+            color: AppColors.bgPrimaryOf(context),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(22),
+            ),
+            boxShadow: const [
               BoxShadow(
                 color: Color(0x14000000),
                 blurRadius: 18,
@@ -68,8 +70,8 @@ class AppBottomNav extends StatelessWidget {
                 ),
                 Expanded(
                   child: _NavItem(
-                    icon: Icons.person_outline,
-                    label: AppStrings.navProfil,
+                    icon: Icons.settings_outlined,
+                    label: AppStrings.navPengaturan,
                     isActive: currentIndex == 4,
                     onTap: () => onTap(4),
                   ),
@@ -142,7 +144,9 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : AppColors.textSecondaryOf(context),
               size: 22,
             ),
             const SizedBox(height: 2),
@@ -151,23 +155,12 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 color: isActive
                     ? AppColors.primaryColor
-                    : AppColors.textSecondary,
+                    : AppColors.textSecondaryOf(context),
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 fontSize: 10,
                 height: 1.3,
               ),
             ),
-            if (isActive) ...[
-              const SizedBox(height: 2),
-              Container(
-                width: 4,
-                height: 4,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
           ],
         ),
       ),

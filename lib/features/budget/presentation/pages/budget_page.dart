@@ -1,61 +1,33 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
+import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
-import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/features/budget/domain/entities/budget_entity.dart';
+import 'package:sisasaku/features/budget/presentation/providers/budget_provider.dart';
+import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
+import 'package:sisasaku/features/transaction/presentation/providers/transaction_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
-class BudgetPage extends StatelessWidget {
+class BudgetPage extends ConsumerWidget {
   const BudgetPage({super.key});
 
-  final List<_BudgetItem> _dummyBudgets = const [
-    _BudgetItem(
-      category: 'Makan',
-      icon: Icons.restaurant,
-      iconColor: AppColors.warningColor,
-      spent: 1200000,
-      limit: 2000000,
-    ),
-    _BudgetItem(
-      category: 'Transportasi',
-      icon: Icons.directions_bus,
-      iconColor: AppColors.textSecondary,
-      spent: 450000,
-      limit: 500000,
-    ),
-    _BudgetItem(
-      category: 'Belanja',
-      icon: Icons.shopping_bag,
-      iconColor: AppColors.tertiary,
-      spent: 1800000,
-      limit: 1500000,
-    ),
-    _BudgetItem(
-      category: 'Kos',
-      icon: Icons.home_work,
-      iconColor: AppColors.primaryColor,
-      spent: 1500000,
-      limit: 1500000,
-    ),
-    _BudgetItem(
-      category: 'Jajan',
-      icon: Icons.local_cafe,
-      iconColor: AppColors.warningDark,
-      spent: 300000,
-      limit: 800000,
-    ),
-  ];
-
   @override
-  Widget build(BuildContext context) {
-    final totalLimit = _dummyBudgets.fold<double>(0, (s, b) => s + b.limit);
-    final totalSpent = _dummyBudgets.fold<double>(0, (s, b) => s + b.spent);
-    final remaining = totalLimit - totalSpent;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = DateTime.now();
+    final budgetsAsync = ref.watch(budgetsProvider);
+    final transactionsAsync = ref.watch(
+      monthlyTransactionsProvider((now.month, now.year)),
+    );
+    final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Stack(
         children: [
           Positioned(
@@ -68,91 +40,162 @@ class BudgetPage extends StatelessWidget {
                 height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withValues(alpha: 0.4),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.4),
                 ),
               ),
             ),
           ),
           SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: AppSpacing.xl),
-                  _buildSummaryCard(totalLimit, totalSpent, remaining),
-                  const SizedBox(height: AppSpacing.lg),
-                  const Text(
-                    'Detail Anggaran',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
+            child: budgetsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) =>
+                  Center(child: Text('Gagal memuat anggaran: $err')),
+              data: (budgets) {
+                final transactions = transactionsAsync.value ?? [];
+                final categories = categoriesAsync.value ?? [];
+                final categoryMap = {for (final c in categories) c.id: c};
+                final visibleBudgets = budgets
+                    .where((b) => b.month == now.month && b.year == now.year)
+                    .toList();
+                final spentByCategory = <String, double>{};
+                for (final tx in transactions.where(
+                  (t) => t.jenis == TransactionType.expense,
+                )) {
+                  spentByCategory.update(
+                    tx.idKategori,
+                    (value) => value + tx.nominal,
+                    ifAbsent: () => tx.nominal,
+                  );
+                }
+                final totalLimit = visibleBudgets.fold<double>(
+                  0,
+                  (s, b) => s + b.limit,
+                );
+                final totalSpent = visibleBudgets.fold<double>(
+                  0,
+                  (s, b) => s + (spentByCategory[b.idKategori] ?? 0),
+                );
+                final remaining = totalLimit - totalSpent;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  ..._dummyBudgets.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                    child: _buildBudgetItem(item),
-                  )),
-                ],
-              ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppPageHeader(
+                        title: 'Anggaran Bulan Ini',
+                        showBackButton: true,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      _buildSummaryCard(context, totalLimit, totalSpent, remaining),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        'Detail Anggaran',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: context.colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      if (visibleBudgets.isEmpty)
+                        _buildEmptyState(context)
+                      else
+                        ...visibleBudgets.map((budget) {
+                          final category = categoryMap[budget.idKategori];
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.md,
+                            ),
+                            child: Dismissible(
+                              key: ValueKey(budget.id),
+                              direction: DismissDirection.endToStart,
+                              background: _deleteBackground(),
+                              confirmDismiss: (_) => FeedbackDialog.showConfirm(
+                                context,
+                                title: 'Hapus Anggaran',
+                                message:
+                                    'Anggaran ${budget.namaKategori} akan dihapus.',
+                                actionLabel: 'Hapus',
+                              ),
+                              onDismissed: (_) {
+                                ref.read(
+                                  deleteBudgetProvider(budget.id).future,
+                                );
+                              },
+                              child: _buildBudgetItem(
+                                context,
+                                budget,
+                                spentByCategory[budget.idKategori] ?? 0,
+                                CategoryUiHelpers.parseIcon(category?.ikon),
+                                CategoryUiHelpers.parseColor(category?.warna),
+                              ),
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(AppRouter.addBudget),
-        backgroundColor: AppColors.primaryColor,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Tambah Anggaran',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: context.colors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.pie_chart_outline,
+            color: context.colors.textSecondary,
+            size: 42,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Belum ada anggaran bulan ini',
+            style: TextStyle(
+              color: context.colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textSecondary,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.bgPrimary,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        const Text(
-          'Anggaran Bulan Ini',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
+  Widget _deleteBackground() {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.dangerColor,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: const Icon(Icons.delete_outline, color: Colors.white),
     );
   }
 
-  Widget _buildSummaryCard(double limit, double spent, double remaining) {
+  Widget _buildSummaryCard(BuildContext context, double limit, double spent, double remaining) {
     final isOver = remaining < 0;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: context.colors.bgPrimary,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: const [
           BoxShadow(
@@ -170,10 +213,10 @@ class BudgetPage extends StatelessWidget {
                 child: _SummaryColumn(
                   label: 'Total Anggaran',
                   amount: limit,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
               ),
-              Container(width: 1, height: 40, color: AppColors.borderColor),
+              Container(width: 1, height: 40, color: context.colors.borderColor),
               Expanded(
                 child: _SummaryColumn(
                   label: 'Terpakai',
@@ -181,12 +224,14 @@ class BudgetPage extends StatelessWidget {
                   color: AppColors.tertiary,
                 ),
               ),
-              Container(width: 1, height: 40, color: AppColors.borderColor),
+              Container(width: 1, height: 40, color: context.colors.borderColor),
               Expanded(
                 child: _SummaryColumn(
                   label: 'Sisa',
                   amount: remaining.abs(),
-                  color: isOver ? AppColors.dangerColor : AppColors.successColor,
+                  color: isOver
+                      ? AppColors.dangerColor
+                      : AppColors.successColor,
                   prefix: isOver ? '-' : '',
                 ),
               ),
@@ -196,9 +241,9 @@ class BudgetPage extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.full),
             child: LinearProgressIndicator(
-              value: (spent / limit).clamp(0, 1),
+              value: limit == 0 ? 0 : (spent / limit).clamp(0, 1),
               minHeight: 8,
-              backgroundColor: AppColors.bgTertiary,
+              backgroundColor: context.colors.bgTertiary,
               valueColor: AlwaysStoppedAnimation(
                 isOver ? AppColors.dangerColor : AppColors.primaryColor,
               ),
@@ -209,15 +254,22 @@ class BudgetPage extends StatelessWidget {
     );
   }
 
-  Widget _buildBudgetItem(_BudgetItem item) {
-    final progress = item.limit > 0 ? (item.spent / item.limit).clamp(0.0, 1.0) : 0.0;
-    final isOver = item.spent > item.limit;
-    final progressColor = isOver ? AppColors.dangerColor : AppColors.primaryColor;
+  Widget _buildBudgetItem(
+    BuildContext context,
+    BudgetEntity budget,
+    double spent,
+    IconData icon,
+    Color iconColor,
+  ) {
+    final progress = budget.limit > 0
+        ? (spent / budget.limit).clamp(0.0, 1.0)
+        : 0.0;
+    final isOver = spent > budget.limit;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: context.colors.bgPrimary,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: const [
           BoxShadow(
@@ -236,10 +288,10 @@ class BudgetPage extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: item.iconColor.withValues(alpha: 0.12),
+                  color: iconColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(item.icon, color: item.iconColor, size: 20),
+                child: Icon(icon, color: iconColor, size: 20),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -247,19 +299,18 @@ class BudgetPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.category,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      budget.namaKategori,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${CurrencyFormatter.format(item.spent)} / ${CurrencyFormatter.format(item.limit)}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w400,
+                      '${CurrencyFormatter.format(spent)} / ${CurrencyFormatter.format(budget.limit)}',
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -293,8 +344,10 @@ class BudgetPage extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: AppColors.bgTertiary,
-              valueColor: AlwaysStoppedAnimation(progressColor),
+              backgroundColor: context.colors.bgTertiary,
+              valueColor: AlwaysStoppedAnimation(
+                isOver ? AppColors.dangerColor : AppColors.primaryColor,
+              ),
             ),
           ),
         ],
@@ -322,11 +375,7 @@ class _SummaryColumn extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-          ),
+          style: TextStyle(color: context.colors.textSecondary, fontSize: 11),
         ),
         const SizedBox(height: 4),
         Text(
@@ -340,20 +389,4 @@ class _SummaryColumn extends StatelessWidget {
       ],
     );
   }
-}
-
-class _BudgetItem {
-  final String category;
-  final IconData icon;
-  final Color iconColor;
-  final double spent;
-  final double limit;
-
-  const _BudgetItem({
-    required this.category,
-    required this.icon,
-    required this.iconColor,
-    required this.spent,
-    required this.limit,
-  });
 }

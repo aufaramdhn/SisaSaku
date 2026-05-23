@@ -151,4 +151,28 @@ class BillRepositoryImpl extends BillRepository {
       rethrow;
     }
   }
+
+  /// Stream semua tagihan (real-time)
+  @override
+  Stream<List<BillEntity>> watchBills() {
+    try {
+      return localDatasource.watchBills().map(
+        (models) => models.map(_modelToEntity).toList(),
+      );
+    } on DatabaseException {
+      rethrow;
+    }
+  }
+
+  /// Stream tagihan by status (real-time)
+  @override
+  Stream<List<BillEntity>> watchBillsByStatus(BillStatus status) {
+    try {
+      return localDatasource
+          .watchBillsByStatus(status.label)
+          .map((models) => models.map(_modelToEntity).toList());
+    } on DatabaseException {
+      rethrow;
+    }
+  }
 }

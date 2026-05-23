@@ -20,8 +20,15 @@ class QuickActionItem {
 
 class QuickActionGrid extends StatelessWidget {
   final List<QuickActionItem> items;
+  final int maxVisible;
+  final VoidCallback? onShowMore;
 
-  const QuickActionGrid({super.key, required this.items});
+  const QuickActionGrid({
+    super.key,
+    required this.items,
+    this.maxVisible = 7,
+    this.onShowMore,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,22 +37,23 @@ class QuickActionGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        childAspectRatio: 0.85,
+        childAspectRatio: 0.95,
         crossAxisSpacing: AppSpacing.sm,
         mainAxisSpacing: AppSpacing.sm,
       ),
-      itemCount: items.length,
+      itemCount: items.length > maxVisible ? maxVisible : items.length,
       itemBuilder: (context, index) {
+        final isMoreTile = items.length > maxVisible && index == maxVisible - 1;
         final item = items[index];
 
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: item.onTap,
+            onTap: isMoreTile ? (onShowMore ?? item.onTap) : item.onTap,
             borderRadius: BorderRadius.circular(AppRadius.lg),
             child: Ink(
               decoration: BoxDecoration(
-                color: AppColors.bgPrimary,
+                color: AppColors.bgPrimaryOf(context),
                 borderRadius: BorderRadius.circular(AppRadius.lg),
                 boxShadow: const [
                   BoxShadow(
@@ -59,23 +67,31 @@ class QuickActionGrid extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: item.backgroundColor,
+                      color: isMoreTile
+                          ? AppColors.bgTertiaryOf(context)
+                          : item.backgroundColor,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(item.icon, color: item.iconColor, size: 20),
+                    child: Icon(
+                      isMoreTile ? Icons.grid_view : item.icon,
+                      color: isMoreTile
+                          ? AppColors.textSecondaryOf(context)
+                          : item.iconColor,
+                      size: 22,
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
-                    item.label,
+                    isMoreTile ? 'Lainnya' : item.label,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 11,
-                      height: 1.4,
+                    style: TextStyle(
+                      color: AppColors.textPrimaryOf(context),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      height: 1.3,
                     ),
                   ),
                 ],

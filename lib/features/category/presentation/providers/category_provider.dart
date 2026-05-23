@@ -22,9 +22,13 @@ final categoryRepositoryProvider = FutureProvider<CategoryRepository>((
 });
 
 /// Provider untuk daftar kategori (StateNotifier)
-final categoriesProvider = StreamProvider<List<CategoryEntity>>((ref) async* {
-  final repository = await ref.watch(categoryRepositoryProvider.future);
-  yield await repository.getCategories();
+final categoriesProvider = StreamProvider<List<CategoryEntity>>((ref) {
+  final repositoryAsync = ref.watch(categoryRepositoryProvider);
+  return repositoryAsync.when(
+    data: (repo) => repo.watchCategories(),
+    loading: () => Stream.value([]),
+    error: (err, stack) => Stream.error(err, stack),
+  );
 });
 
 /// Provider untuk add kategori
@@ -45,6 +49,13 @@ final updateCategoryProvider =
     ) async {
       final repository = await ref.watch(categoryRepositoryProvider.future);
       return repository.updateCategory(category);
+    });
+
+/// Provider untuk get kategori by ID
+final categoryByIdProvider =
+    FutureProvider.family<CategoryEntity?, String>((ref, categoryId) async {
+      final repository = await ref.watch(categoryRepositoryProvider.future);
+      return repository.getCategoryById(categoryId);
     });
 
 /// Provider untuk delete kategori

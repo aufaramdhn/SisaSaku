@@ -96,4 +96,16 @@ class CategoryRepositoryImpl extends CategoryRepository {
       rethrow;
     }
   }
+
+  /// Stream semua kategori (real-time)
+  @override
+  Stream<List<CategoryEntity>> watchCategories() {
+    try {
+      return localDatasource.watchCategories().map(
+        (models) => models.map(_modelToEntity).toList(),
+      );
+    } on DatabaseException {
+      rethrow;
+    }
+  }
 }

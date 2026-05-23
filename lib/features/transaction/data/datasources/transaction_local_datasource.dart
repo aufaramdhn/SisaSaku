@@ -1,4 +1,5 @@
 import 'package:isar/isar.dart';
+import 'package:sisasaku/core/services/sync_service.dart';
 import 'package:sisasaku/features/transaction/data/models/transaction_model.dart';
 import 'package:sisasaku/core/errors/exceptions.dart';
 
@@ -73,7 +74,10 @@ class TransactionLocalDatasource {
     TransactionModel transaction,
   ) async {
     try {
-      final updated = transaction.copyWith(updatedAt: DateTime.now());
+      final updated = transaction.copyWith(
+        updatedAt: DateTime.now(),
+        syncStatus: false,
+      )..isarId = transaction.isarId;
       await isar.writeTxn(() async {
         await isar.transactionModels.put(updated);
       });
@@ -88,6 +92,7 @@ class TransactionLocalDatasource {
     try {
       final transaction = await getTransactionById(id);
       if (transaction != null) {
+        await SyncService.queueDelete(SyncService.tableTransactions, id);
         await isar.writeTxn(() async {
           await isar.transactionModels.delete(transaction.isarId!);
         });
@@ -118,6 +123,54 @@ class TransactionLocalDatasource {
       }
     } catch (e) {
       throw DatabaseException(message: 'Gagal mensinkronisasi transaksi: $e');
+    }
+  }
+
+  /// Watch semua transaksi (real-time stream)
+  Stream<List<TransactionModel>> watchTransactions() {
+    try {
+      return isar.transactionModels.where().watch(fireImmediately: true).map((
+        transactions,
+      ) {
+        transactions.sort(
+          (a, b) => (b.tanggal ?? DateTime.now()).compareTo(
+            a.tanggal ?? DateTime.now(),
+          ),
+        );
+        return transactions;
+      });
+    } catch (e) {
+      throw DatabaseException(message: 'Gagal memantau transaksi: $e');
+    }
+  }
+
+  /// Watch transaksi dalam range tanggal (real-time stream)
+  Stream<List<TransactionModel>> watchTransactionsByDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    try {
+      return isar.transactionModels.where().watch(fireImmediately: true).map((
+        transactions,
+      ) {
+        final filtered =
+            transactions
+                .where(
+                  (t) =>
+                      t.tanggal != null &&
+                      t.tanggal!.isAfter(startDate) &&
+                      t.tanggal!.isBefore(endDate),
+                )
+                .toList()
+              ..sort(
+                (a, b) => (b.tanggal ?? DateTime.now()).compareTo(
+                  a.tanggal ?? DateTime.now(),
+                ),
+              );
+        return filtered;
+      });
+    } catch (e) {
+      throw DatabaseException(message: 'Gagal memantau transaksi: $e');
     }
   }
 }

@@ -4,13 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
-import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
 import 'package:sisasaku/features/transaction/domain/entities/transaction_entity.dart';
 import 'package:sisasaku/features/transaction/presentation/providers/transaction_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 import 'package:uuid/uuid.dart';
 
 class AddTransactionPage extends ConsumerStatefulWidget {
@@ -30,8 +31,18 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
 
   final _hariList = const ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
   final _bulanList = const [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
   ];
 
   @override
@@ -55,9 +66,9 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context)
-                .colorScheme
-                .copyWith(primary: AppColors.primaryColor),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppColors.primaryColor),
           ),
           child: child!,
         );
@@ -73,11 +84,17 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
   Future<void> _submit() async {
     final nominal = CurrencyFormatter.parse(_nominalController.text);
     if (nominal <= 0) {
-      _showSnackBar('Nominal harus lebih dari 0');
+      _showErrorDialog(
+        title: 'Nominal belum valid',
+        message: 'Nominal harus lebih dari 0.',
+      );
       return;
     }
     if (_selectedCategoryId == null) {
-      _showSnackBar('Pilih kategori terlebih dahulu');
+      _showErrorDialog(
+        title: 'Kategori belum dipilih',
+        message: 'Silakan pilih kategori terlebih dahulu.',
+      );
       return;
     }
 
@@ -87,7 +104,9 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
       jenis: _isExpense ? TransactionType.expense : TransactionType.income,
       tanggal: _selectedDate,
       idKategori: _selectedCategoryId!,
-      deskripsi: _catatanController.text.isEmpty ? null : _catatanController.text,
+      deskripsi: _catatanController.text.isEmpty
+          ? null
+          : _catatanController.text,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       syncStatus: false,
@@ -99,12 +118,23 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
       final repository = await ref.read(transactionRepositoryProvider.future);
       await repository.addTransaction(transaction);
       if (mounted) {
-        _showSnackBar('Transaksi berhasil disimpan');
-        context.pop();
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Transaksi berhasil disimpan',
+          message: 'Data transaksi sudah masuk ke daftar.',
+          onAction: () {
+            if (mounted) {
+              context.pop();
+            }
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Gagal menyimpan transaksi: $e');
+        _showErrorDialog(
+          title: 'Gagal menyimpan transaksi',
+          message: e.toString(),
+        );
       }
     } finally {
       if (mounted) {
@@ -113,9 +143,12 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  void _showErrorDialog({required String title, required String message}) {
+    FeedbackDialog.showError<void>(
+      context,
+      title: title,
+      message: message,
+      actionLabel: 'Oke',
     );
   }
 
@@ -124,65 +157,40 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: context.colors.bgPrimary,
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textSecondary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Text(
-                    AppStrings.catatTransaksi,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              child: const AppPageHeader(
+                title: 'Catat Transaksi',
+                showBackButton: true,
               ),
             ),
-            // Scrollable form
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildToggle(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xl),
                     _buildNominalField(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xl),
                     _buildDateField(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xl),
                     _buildKategoriField(categoriesAsync),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xl),
                     _buildCatatanField(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xl),
                   ],
                 ),
               ),
             ),
-            // Sticky submit button
             Padding(
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.lg,
@@ -202,8 +210,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.bgTertiary,
-        borderRadius: BorderRadius.circular(14),
+        color: context.colors.bgTertiary,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         children: [
@@ -235,12 +243,12 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
+      color: isActive ? context.colors.bgPrimary : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.md),
       elevation: isActive ? 1 : 0,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           alignment: Alignment.center,
@@ -249,14 +257,22 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
             children: [
               Icon(
                 icon,
-                color: isActive ? AppColors.tertiary : AppColors.textSecondary,
+                color: isActive
+                    ? (_isExpense
+                          ? AppColors.dangerColor
+                          : AppColors.primaryColor)
+                    : context.colors.textSecondary,
                 size: 16,
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 label,
                 style: TextStyle(
-                  color: isActive ? AppColors.tertiary : AppColors.textSecondary,
+                  color: isActive
+                      ? (_isExpense
+                            ? AppColors.dangerColor
+                            : AppColors.primaryColor)
+                      : context.colors.textSecondary,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                   height: 1.4,
@@ -270,120 +286,22 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
   }
 
   Widget _buildNominalField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nominal',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Text(
-              'Rp',
-              style: TextStyle(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 28,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: TextField(
-                controller: _nominalController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 28,
-                  height: 1.2,
-                ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  hintText: '0',
-                  hintStyle: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 28,
-                  ),
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  const _ThousandSeparatorFormatter(),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const Divider(color: AppColors.borderColor, height: 1),
+    return AppMoneyField(
+      controller: _nominalController,
+      label: 'Nominal',
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        const _ThousandSeparatorFormatter(),
       ],
     );
   }
 
   Widget _buildDateField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tanggal',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        GestureDetector(
-          onTap: _pickDate,
-          child: Container(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AppColors.borderColor),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  color: AppColors.textSecondary,
-                  size: 18,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _formattedDate,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textSecondary,
-                  size: 18,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return AppSelectableField(
+      label: 'Tanggal',
+      value: _formattedDate,
+      icon: Icons.calendar_today_outlined,
+      onTap: _pickDate,
     );
   }
 
@@ -391,25 +309,14 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Kategori',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
+        const AppFieldLabel(label: 'Kategori'),
         const SizedBox(height: AppSpacing.md),
         categoriesAsync.when(
           data: (categories) {
             if (categories.isEmpty) {
-              return const Text(
+              return Text(
                 'Belum ada kategori',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: context.colors.textSecondary, fontSize: 14),
               );
             }
             return Wrap(
@@ -427,14 +334,23 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.primaryLight
-                          : AppColors.bgSecondary,
+                          : context.colors.bgSecondary,
                       borderRadius: BorderRadius.circular(AppRadius.full),
                       border: Border.all(
                         color: isSelected
                             ? AppColors.primaryColor
-                            : Colors.transparent,
-                        width: 1.5,
+                            : context.colors.borderColor.withValues(alpha: 0.35),
+                        width: 1,
                       ),
+                      boxShadow: isSelected
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x0A000000),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -443,7 +359,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
                           CategoryUiHelpers.parseIcon(cat.ikon),
                           color: isSelected
                               ? AppColors.primaryColor
-                              : AppColors.textSecondary,
+                              : context.colors.textSecondary,
                           size: 16,
                         ),
                         const SizedBox(width: AppSpacing.xs),
@@ -452,7 +368,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
                           style: TextStyle(
                             color: isSelected
                                 ? AppColors.primaryColor
-                                : AppColors.textSecondary,
+                                : context.colors.textSecondary,
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.w400,
@@ -478,69 +394,12 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
   }
 
   Widget _buildCatatanField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Catatan',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              '(opsional)',
-              style: TextStyle(
-                color: AppColors.textSecondary.withValues(alpha: 0.6),
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: _catatanController,
-          maxLines: 3,
-          minLines: 1,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-            height: 1.5,
-          ),
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.primaryColor),
-            ),
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            hintText: 'Tambah catatan...',
-            hintStyle: TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
+    return AppModernTextField(
+      controller: _catatanController,
+      label: 'Catatan',
+      optionalText: '(opsional)',
+      hint: 'Tambah catatan...',
+      maxLines: 3,
     );
   }
 
@@ -549,7 +408,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage> {
       width: double.infinity,
       height: 52,
       child: Material(
-        color: _isLoading ? AppColors.textSecondary : AppColors.primaryColor,
+        color: _isLoading ? context.colors.textSecondary : AppColors.primaryColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           onTap: _isLoading ? null : _submit,
@@ -604,8 +463,10 @@ class _ThousandSeparatorFormatter extends TextInputFormatter {
 
     final text = buffer.toString();
     final offsetDelta = text.length - newValue.text.length;
-    final newOffset = (newValue.selection.end + offsetDelta)
-        .clamp(0, text.length);
+    final newOffset = (newValue.selection.end + offsetDelta).clamp(
+      0,
+      text.length,
+    );
 
     return TextEditingValue(
       text: text,

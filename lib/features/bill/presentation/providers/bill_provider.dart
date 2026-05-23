@@ -21,9 +21,13 @@ final billRepositoryProvider = FutureProvider<BillRepository>((ref) async {
 });
 
 /// Provider untuk daftar tagihan
-final billsProvider = StreamProvider<List<BillEntity>>((ref) async* {
-  final repository = await ref.watch(billRepositoryProvider.future);
-  yield await repository.getBills();
+final billsProvider = StreamProvider<List<BillEntity>>((ref) {
+  final repositoryAsync = ref.watch(billRepositoryProvider);
+  return repositoryAsync.when(
+    data: (repo) => repo.watchBills(),
+    loading: () => Stream.value([]),
+    error: (err, stack) => Stream.error(err, stack),
+  );
 });
 
 /// Provider untuk tagihan by ID
@@ -49,9 +53,13 @@ final overdueBillsProvider = StreamProvider<List<BillEntity>>((ref) async* {
 
 /// Provider untuk tagihan by status
 final billsByStatusProvider =
-    StreamProvider.family<List<BillEntity>, BillStatus>((ref, status) async* {
-      final repository = await ref.watch(billRepositoryProvider.future);
-      yield await repository.getBillsByStatus(status);
+    StreamProvider.family<List<BillEntity>, BillStatus>((ref, status) {
+      final repositoryAsync = ref.watch(billRepositoryProvider);
+      return repositoryAsync.when(
+        data: (repo) => repo.watchBillsByStatus(status),
+        loading: () => Stream.value([]),
+        error: (err, stack) => Stream.error(err, stack),
+      );
     });
 
 /// Provider untuk add tagihan

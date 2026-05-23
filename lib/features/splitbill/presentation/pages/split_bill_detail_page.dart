@@ -1,40 +1,26 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
+import 'package:sisasaku/features/splitbill/domain/entities/split_bill_entity.dart';
+import 'package:sisasaku/features/splitbill/presentation/providers/split_bill_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
-class SplitBillDetailPage extends StatefulWidget {
+class SplitBillDetailPage extends ConsumerWidget {
   final String splitBillId;
 
   const SplitBillDetailPage({super.key, required this.splitBillId});
 
   @override
-  State<SplitBillDetailPage> createState() => _SplitBillDetailPageState();
-}
-
-class _SplitBillDetailPageState extends State<SplitBillDetailPage> {
-  final _dummyParticipants = [
-    _Participant(name: 'Andi', amount: 50000, isPaid: true),
-    _Participant(name: 'Budi', amount: 50000, isPaid: false),
-    _Participant(name: 'Citra', amount: 50000, isPaid: true),
-    _Participant(name: 'Dewi', amount: 50000, isPaid: false),
-  ];
-
-  final double _total = 200000;
-  final String _title = 'Makan Bareng Warung Pak Kumis';
-
-  @override
-  Widget build(BuildContext context) {
-    final paidCount = _dummyParticipants.where((p) => p.isPaid).length;
-    final totalPaid = _dummyParticipants
-        .where((p) => p.isPaid)
-        .fold<double>(0, (s, p) => s + p.amount);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final splitBillAsync = ref.watch(splitBillByIdProvider(splitBillId));
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.bgSecondaryOf(context),
       body: Stack(
         children: [
           Positioned(
@@ -47,216 +33,224 @@ class _SplitBillDetailPageState extends State<SplitBillDetailPage> {
                 height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withValues(alpha: 0.4),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.4),
                 ),
               ),
             ),
           ),
           SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: AppSpacing.xl),
-                  _buildNominalBlock(),
-                  const SizedBox(height: AppSpacing.lg),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgPrimary,
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0A000000),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.groups,
-                              color: AppColors.primaryColor,
-                              size: 18,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            const Expanded(
-                              child: Text(
-                                'Peserta',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '$paidCount/${_dummyParticipants.length}',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                          child: LinearProgressIndicator(
-                            value: _dummyParticipants.isNotEmpty
-                                ? paidCount / _dummyParticipants.length
-                                : 0,
-                            minHeight: 8,
-                            backgroundColor: AppColors.bgTertiary,
-                            valueColor: const AlwaysStoppedAnimation(
-                              AppColors.primaryColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ..._dummyParticipants.map((p) {
-                          return _buildParticipantRow(p);
-                        }),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgPrimary,
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0A000000),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total Terkumpul',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Text(
-                          CurrencyFormatter.format(totalPaid),
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            child: splitBillAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) =>
+                  Center(child: Text('Gagal memuat detail: $err')),
+              data: (splitBill) {
+                if (splitBill == null) {
+                  return const Center(
+                    child: Text('Data bagi rata tidak ditemukan'),
+                  );
+                }
+                return _DetailContent(splitBill: splitBill);
+              },
             ),
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.lg,
-            MediaQuery.of(context).padding.bottom + AppSpacing.md,
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: Material(
-              color: AppColors.primaryColor,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              child: InkWell(
-                onTap: () => context.pop(),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Container(
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'Tandai Selesai',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context) {
-    return Row(
+class _DetailContent extends ConsumerWidget {
+  final SplitBillEntity splitBill;
+
+  const _DetailContent({required this.splitBill});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paidCount = splitBill.paidParticipantNames.length;
+    final progress = splitBill.participantNames.isEmpty
+        ? 0.0
+        : paidCount / splitBill.participantNames.length;
+
+    return Column(
       children: [
-        IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textSecondary,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.bgPrimary,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        const Expanded(
-          child: Text(
-            'Detail Bagi Rata',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-              color: AppColors.textPrimary,
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context, ref),
+                const SizedBox(height: AppSpacing.xl),
+                _buildNominalBlock(context),
+                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgPrimaryOf(context),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0A000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.groups,
+                            color: AppColors.primaryColor,
+                            size: 18,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Peserta',
+                              style: TextStyle(
+                                color: AppColors.textPrimaryOf(context),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '$paidCount/${splitBill.participantNames.length}',
+                            style: TextStyle(
+                              color: AppColors.textSecondaryOf(context),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 8,
+                          backgroundColor: AppColors.bgTertiaryOf(context),
+                          valueColor: const AlwaysStoppedAnimation(
+                            AppColors.primaryColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      ...List.generate(splitBill.participantNames.length, (
+                        index,
+                      ) {
+                        final name = splitBill.participantNames[index];
+                        final amount =
+                            index < splitBill.participantAmounts.length
+                            ? splitBill.participantAmounts[index]
+                            : 0.0;
+                        final isPaid = splitBill.paidParticipantNames.contains(
+                          name,
+                        );
+                        return _buildParticipantRow(
+                          context,
+                          ref,
+                          name,
+                          amount,
+                          isPaid,
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _buildTotalCollected(context),
+              ],
             ),
           ),
         ),
-        IconButton(
-          onPressed: () {},
-          icon: const Icon(
-            Icons.delete_outline,
-            color: AppColors.dangerColor,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.dangerLight,
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.md,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: () async {
+                  for (final name in splitBill.participantNames) {
+                    await ref.read(
+                      markParticipantPaidProvider((
+                        splitBill.id,
+                        name,
+                        true,
+                      )).future,
+                    );
+                  }
+                  if (context.mounted) context.pop();
+                },
+                child: const Text('Tandai Semua Lunas'),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildNominalBlock() {
+  Widget _buildHeader(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () => context.pop(),
+          icon: Icon(Icons.arrow_back, color: AppColors.textSecondaryOf(context)),
+          style: IconButton.styleFrom(backgroundColor: AppColors.bgPrimaryOf(context)),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Text(
+            'Detail Bagi Rata',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimaryOf(context),
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: () async {
+            final confirmed = await FeedbackDialog.showConfirm(
+              context,
+              title: 'Hapus Bagi Rata',
+              message: 'Data bagi rata ini akan dihapus. Lanjutkan?',
+              actionLabel: 'Hapus',
+            );
+            if (!context.mounted || !confirmed) return;
+            await ref.read(deleteSplitBillProvider(splitBill.id).future);
+            if (context.mounted) context.pop();
+          },
+          icon: const Icon(Icons.delete_outline, color: AppColors.dangerColor),
+          style: IconButton.styleFrom(backgroundColor: AppColors.dangerLight),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNominalBlock(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: AppColors.bgPrimaryOf(context),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: const [
           BoxShadow(
@@ -270,73 +264,49 @@ class _SplitBillDetailPageState extends State<SplitBillDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _title,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
+            splitBill.title,
+            style: TextStyle(
+              color: AppColors.textSecondaryOf(context),
               fontSize: 12,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Rp',
-                style: TextStyle(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 28,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                CurrencyFormatter.format(_total).replaceFirst('Rp', ''),
-                style: const TextStyle(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 28,
-                  height: 1.2,
-                ),
-              ),
-            ],
+          Text(
+            CurrencyFormatter.format(splitBill.total),
+            style: const TextStyle(
+              color: AppColors.primaryColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 28,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildParticipantRow(_Participant p) {
+  Widget _buildParticipantRow(
+    BuildContext context,
+    WidgetRef ref,
+    String name,
+    double amount,
+    bool isPaid,
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          setState(() {
-            p.isPaid = !p.isPaid;
-          });
-        },
+        onTap: () => ref.read(
+          markParticipantPaidProvider((splitBill.id, name, !isPaid)).future,
+        ),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: p.isPaid
-                      ? AppColors.successLight
-                      : AppColors.bgSecondary,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  p.isPaid ? Icons.check : Icons.person_outline,
-                  color: p.isPaid
-                      ? AppColors.successColor
-                      : AppColors.textSecondary,
-                  size: 20,
-                ),
+              Icon(
+                isPaid ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: isPaid
+                    ? AppColors.successColor
+                    : AppColors.textSecondaryOf(context),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -344,42 +314,39 @@ class _SplitBillDetailPageState extends State<SplitBillDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      p.name,
+                      name,
                       style: TextStyle(
-                        color: p.isPaid
-                            ? AppColors.textSecondary
-                            : AppColors.textPrimary,
+                        color: isPaid
+                            ? AppColors.textSecondaryOf(context)
+                            : AppColors.textPrimaryOf(context),
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        decoration: p.isPaid ? TextDecoration.lineThrough : null,
+                        decoration: isPaid ? TextDecoration.lineThrough : null,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      CurrencyFormatter.format(p.amount),
+                      CurrencyFormatter.format(amount),
                       style: TextStyle(
-                        color: p.isPaid
-                            ? AppColors.textSecondary
+                        color: isPaid
+                            ? AppColors.textSecondaryOf(context)
                             : AppColors.primaryColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
-                        decoration: p.isPaid ? TextDecoration.lineThrough : null,
                       ),
                     ),
                   ],
                 ),
               ),
               Checkbox(
-                value: p.isPaid,
-                onChanged: (v) {
-                  setState(() {
-                    p.isPaid = v ?? false;
-                  });
-                },
-                activeColor: AppColors.successColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
+                value: isPaid,
+                onChanged: (value) => ref.read(
+                  markParticipantPaidProvider((
+                    splitBill.id,
+                    name,
+                    value ?? false,
+                  )).future,
                 ),
+                activeColor: AppColors.successColor,
               ),
             ],
           ),
@@ -387,16 +354,31 @@ class _SplitBillDetailPageState extends State<SplitBillDetailPage> {
       ),
     );
   }
-}
 
-class _Participant {
-  String name;
-  double amount;
-  bool isPaid;
-
-  _Participant({
-    required this.name,
-    required this.amount,
-    required this.isPaid,
-  });
+  Widget _buildTotalCollected(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.bgPrimaryOf(context),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Total Terkumpul',
+            style: TextStyle(color: AppColors.textSecondaryOf(context), fontSize: 14),
+          ),
+          Text(
+            CurrencyFormatter.format(splitBill.paidTotal),
+            style: TextStyle(
+              color: AppColors.textPrimaryOf(context),
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

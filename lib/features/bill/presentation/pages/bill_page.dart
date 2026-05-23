@@ -7,7 +7,7 @@ import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/core/enums.dart';
-import 'package:sisasaku/core/services/notification_service.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/features/bill/domain/entities/bill_entity.dart';
 import 'package:sisasaku/features/bill/presentation/providers/bill_provider.dart';
@@ -46,89 +46,12 @@ class _BillPageState extends ConsumerState<BillPage> {
     }
   }
 
-  Color _dateColor(BillEntity bill) {
-    if (bill.status == BillStatus.paid) return AppColors.textSecondary;
+  Color _dateColor(BuildContext context, BillEntity bill) {
+    if (bill.status == BillStatus.paid) {
+      return AppColors.textSecondaryOf(context);
+    }
     if (bill.status == BillStatus.overdue) return AppColors.dangerColor;
-    return AppColors.textSecondary;
-  }
-
-  Future<bool> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hapus Tagihan'),
-        content: const Text('Tagihan akan dihapus permanen. Lanjutkan?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Hapus',
-              style: TextStyle(color: AppColors.dangerColor),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return confirmed ?? false;
-  }
-
-  Future<void> _deleteBill(BillEntity bill) async {
-    try {
-      final localDatasource = await ref.read(
-        billLocalDatasourceProvider.future,
-      );
-      final billModel = await localDatasource.getBillById(bill.id);
-      if (billModel?.isarId != null) {
-        await NotificationService().cancelBillReminder(billModel!.isarId!);
-      }
-
-      await ref.read(deleteBillProvider(bill.id).future);
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Tagihan dihapus')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal menghapus tagihan: $e')));
-      }
-    }
-  }
-
-  Future<void> _markBillPaid(BillEntity bill) async {
-    try {
-      await ref.read(
-        updateBillStatusProvider((bill.id, BillStatus.paid)).future,
-      );
-
-      final localDatasource = await ref.read(
-        billLocalDatasourceProvider.future,
-      );
-      final billModel = await localDatasource.getBillById(bill.id);
-      if (billModel?.isarId != null) {
-        await NotificationService().cancelBillReminder(billModel!.isarId!);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Tagihan ditandai lunas')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal mengubah status: $e')));
-      }
-    }
+    return AppColors.textSecondaryOf(context);
   }
 
   @override
@@ -136,7 +59,7 @@ class _BillPageState extends ConsumerState<BillPage> {
     final billsAsync = ref.watch(billsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Stack(
         children: [
           Positioned(
@@ -250,22 +173,18 @@ class _BillPageState extends ConsumerState<BillPage> {
       allWidgets.add(const SizedBox(height: AppSpacing.md));
       for (final bill in overdue) {
         allWidgets.add(
-          _wrapDismissible(
-            bill,
-            _BillCard(
-              icon: Icons.wifi,
-              iconColor: AppColors.dangerColor,
-              iconBgColor: AppColors.dangerLight,
-              title: bill.nama,
-              date: _formatRelativeDate(bill),
-              dateColor: _dateColor(bill),
-              amount: bill.nominal ?? 0,
-              leftBorderColor: AppColors.dangerColor,
-              backgroundColor: AppColors.bgPrimary,
-              onTap: () =>
-                  context.push(AppRouter.editBill.replaceAll(':id', bill.id)),
-              onMarkPaid: () => _markBillPaid(bill),
-            ),
+          _BillCard(
+            icon: Icons.wifi,
+            iconColor: AppColors.dangerColor,
+            iconBgColor: AppColors.dangerLight,
+            title: bill.nama,
+            date: _formatRelativeDate(bill),
+            dateColor: _dateColor(context, bill),
+            amount: bill.nominal ?? 0,
+            leftBorderColor: AppColors.dangerColor,
+            backgroundColor: context.colors.bgPrimary,
+            onTap: () =>
+                context.push(AppRouter.billDetail.replaceAll(':id', bill.id)),
           ),
         );
         allWidgets.add(const SizedBox(height: AppSpacing.md));
@@ -279,22 +198,18 @@ class _BillPageState extends ConsumerState<BillPage> {
       allWidgets.add(const SizedBox(height: AppSpacing.md));
       for (final bill in upcoming) {
         allWidgets.add(
-          _wrapDismissible(
-            bill,
-            _BillCard(
-              icon: Icons.house,
-              iconColor: AppColors.warningDark,
-              iconBgColor: AppColors.warningLight,
-              title: bill.nama,
-              date: _formatRelativeDate(bill),
-              dateColor: _dateColor(bill),
-              amount: bill.nominal ?? 0,
-              leftBorderColor: AppColors.warningColor,
-              backgroundColor: const Color(0xFFFFFDF7),
-              onTap: () =>
-                  context.push(AppRouter.editBill.replaceAll(':id', bill.id)),
-              onMarkPaid: () => _markBillPaid(bill),
-            ),
+          _BillCard(
+            icon: Icons.house,
+            iconColor: AppColors.warningDark,
+            iconBgColor: AppColors.warningLight,
+            title: bill.nama,
+            date: _formatRelativeDate(bill),
+            dateColor: _dateColor(context, bill),
+            amount: bill.nominal ?? 0,
+            leftBorderColor: AppColors.warningColor,
+            backgroundColor: const Color(0xFFFFFDF7),
+            onTap: () =>
+                context.push(AppRouter.billDetail.replaceAll(':id', bill.id)),
           ),
         );
         allWidgets.add(const SizedBox(height: AppSpacing.md));
@@ -312,22 +227,19 @@ class _BillPageState extends ConsumerState<BillPage> {
       allWidgets.add(const SizedBox(height: AppSpacing.md));
       for (final bill in paid) {
         allWidgets.add(
-          _wrapDismissible(
-            bill,
-            _BillCard(
-              icon: Icons.bolt,
-              iconColor: AppColors.successColor,
-              iconBgColor: AppColors.successLight,
-              title: bill.nama,
-              date: _formatRelativeDate(bill),
-              dateColor: _dateColor(bill),
-              amount: bill.nominal ?? 0,
-              leftBorderColor: AppColors.borderColor,
-              backgroundColor: AppColors.bgPrimary,
-              isPaid: true,
-              onTap: () =>
-                  context.push(AppRouter.editBill.replaceAll(':id', bill.id)),
-            ),
+          _BillCard(
+            icon: Icons.bolt,
+            iconColor: AppColors.successColor,
+            iconBgColor: AppColors.successLight,
+            title: bill.nama,
+            date: _formatRelativeDate(bill),
+            dateColor: _dateColor(context, bill),
+            amount: bill.nominal ?? 0,
+            leftBorderColor: context.colors.borderColor,
+            backgroundColor: context.colors.bgPrimary,
+            isPaid: true,
+            onTap: () =>
+                context.push(AppRouter.billDetail.replaceAll(':id', bill.id)),
           ),
         );
         allWidgets.add(const SizedBox(height: AppSpacing.md));
@@ -349,25 +261,6 @@ class _BillPageState extends ConsumerState<BillPage> {
     );
   }
 
-  Widget _wrapDismissible(BillEntity bill, Widget child) {
-    return Dismissible(
-      key: ValueKey(bill.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) => _confirmDelete(context),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppColors.dangerColor,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      onDismissed: (_) => _deleteBill(bill),
-      child: child,
-    );
-  }
-
   Widget _buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -379,7 +272,7 @@ class _BillPageState extends ConsumerState<BillPage> {
               height: 32,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.borderColor),
+                border: Border.all(color: context.colors.borderColor),
               ),
               child: ClipOval(
                 child: Image.network(
@@ -401,7 +294,7 @@ class _BillPageState extends ConsumerState<BillPage> {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {},
+            onTap: () => context.push(AppRouter.notifications),
             borderRadius: BorderRadius.circular(AppRadius.full),
             child: Container(
               width: 40,
@@ -438,9 +331,9 @@ class _BillPageState extends ConsumerState<BillPage> {
       (
         'Lunas ($paidCount)',
         'paid',
-        AppColors.bgPrimary,
-        AppColors.textSecondary,
-        AppColors.borderColor,
+        context.colors.bgPrimary,
+        context.colors.textSecondary,
+        context.colors.borderColor,
       ),
     ];
 
@@ -454,7 +347,7 @@ class _BillPageState extends ConsumerState<BillPage> {
               child: Material(
                 color: _filter == value || (_filter == 'all' && value != '')
                     ? bgColor
-                    : AppColors.bgPrimary,
+                    : context.colors.bgPrimary,
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 child: InkWell(
                   onTap: () {
@@ -497,8 +390,8 @@ class _BillPageState extends ConsumerState<BillPage> {
         const SizedBox(width: AppSpacing.xs),
         Text(
           title,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: context.colors.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 16,
             height: 1.3,
@@ -521,7 +414,6 @@ class _BillCard extends StatelessWidget {
   final Color backgroundColor;
   final bool isPaid;
   final VoidCallback? onTap;
-  final VoidCallback? onMarkPaid;
 
   const _BillCard({
     required this.icon,
@@ -535,106 +427,130 @@ class _BillCard extends StatelessWidget {
     required this.backgroundColor,
     this.isPaid = false,
     this.onTap,
-    this.onMarkPaid,
   });
 
   @override
   Widget build(BuildContext context) {
+    final displayTitle = title.trim().isEmpty ? 'Tagihan' : title;
+    final displayDate = date.trim().isEmpty ? '-' : date;
+    final displayAmount = amount.isFinite ? amount : 0.0;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: Container(
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border(
-            left: BorderSide(color: leftBorderColor, width: 3),
-            top: const BorderSide(color: AppColors.borderColor),
-            right: const BorderSide(color: AppColors.borderColor),
-            bottom: const BorderSide(color: AppColors.borderColor),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: context.colors.borderColor),
           ),
-        ),
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                shape: BoxShape.circle,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(width: 3, color: leftBorderColor),
               ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: isPaid
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      height: 1.4,
-                      decoration: isPaid ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, color: dateColor, size: 14),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text(
-                        date,
-                        style: TextStyle(
-                          color: dateColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 11,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  CurrencyFormatter.format(amount),
-                  style: TextStyle(
-                    color: isPaid
-                        ? AppColors.textSecondary
-                        : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    height: 1.3,
-                    decoration: isPaid ? TextDecoration.lineThrough : null,
-                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
                 ),
-                if (!isPaid) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  GestureDetector(
-                    onTap: onMarkPaid,
-                    child: const Text(
-                      'Bayar',
-                      style: TextStyle(
-                        color: AppColors.primaryColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        height: 1.4,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: iconBgColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: iconColor, size: 20),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayTitle,
+                            style: TextStyle(
+                              color: isPaid
+                                  ? context.colors.textSecondary
+                                  : context.colors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              height: 1.4,
+                              decoration: isPaid
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                color: dateColor,
+                                size: 14,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Text(
+                                displayDate,
+                                style: TextStyle(
+                                  color: dateColor,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 11,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ],
-            ),
-          ],
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          CurrencyFormatter.format(displayAmount),
+                          style: TextStyle(
+                            color: isPaid
+                                ? context.colors.textSecondary
+                                : context.colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            height: 1.3,
+                            decoration: isPaid
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        if (!isPaid) const SizedBox(height: AppSpacing.xs),
+                        if (!isPaid)
+                          const Text(
+                            'Detail',
+                            style: TextStyle(
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              height: 1.4,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

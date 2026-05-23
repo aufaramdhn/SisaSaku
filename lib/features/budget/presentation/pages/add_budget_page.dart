@@ -1,23 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/features/budget/domain/entities/budget_entity.dart';
+import 'package:sisasaku/features/budget/presentation/providers/budget_provider.dart';
+import 'package:sisasaku/features/category/domain/entities/category_entity.dart';
+import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
+import 'package:uuid/uuid.dart';
 
-class AddBudgetPage extends StatefulWidget {
+class AddBudgetPage extends ConsumerStatefulWidget {
   const AddBudgetPage({super.key});
 
   @override
-  State<AddBudgetPage> createState() => _AddBudgetPageState();
+  ConsumerState<AddBudgetPage> createState() => _AddBudgetPageState();
 }
 
-class _AddBudgetPageState extends State<AddBudgetPage> {
-  String _selectedCategory = 'Makan';
+class _AddBudgetPageState extends ConsumerState<AddBudgetPage> {
+  String? _selectedCategoryId;
+  String _selectedCategoryName = 'Makan';
   final _nominalController = TextEditingController();
   bool _isMonthly = true;
 
   final List<({String name, IconData icon, Color color})> _categories = [
     (name: 'Makan', icon: Icons.restaurant, color: AppColors.warningColor),
-    (name: 'Transportasi', icon: Icons.directions_bus, color: AppColors.textSecondary),
+    (
+      name: 'Transportasi',
+      icon: Icons.directions_bus,
+      color: AppColors.textSecondary,
+    ),
     (name: 'Kos', icon: Icons.home_work, color: AppColors.primaryColor),
     (name: 'Belanja', icon: Icons.shopping_bag, color: AppColors.tertiary),
     (name: 'Jajan', icon: Icons.local_cafe, color: AppColors.warningDark),
@@ -33,8 +45,40 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
 
   @override
   Widget build(BuildContext context) {
+    final categories =
+        ref.watch(categoriesProvider).value ?? const <CategoryEntity>[];
+    final categoryOptions = categories.isEmpty
+        ? _categories
+              .map(
+                (cat) => (
+                  id: cat.name.toLowerCase(),
+                  name: cat.name,
+                  icon: cat.icon,
+                  color: cat.color,
+                ),
+              )
+              .toList()
+        : categories
+              .map(
+                (cat) => (
+                  id: cat.id,
+                  name: cat.nama,
+                  icon: _iconForName(cat.ikon),
+                  color: _colorForHex(cat.warna),
+                ),
+              )
+              .toList();
+    _selectedCategoryId ??= categoryOptions.isNotEmpty
+        ? categoryOptions.first.id
+        : null;
+    if (categoryOptions.isNotEmpty &&
+        !categoryOptions.any((cat) => cat.id == _selectedCategoryId)) {
+      _selectedCategoryId = categoryOptions.first.id;
+      _selectedCategoryName = categoryOptions.first.name;
+    }
+
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -43,43 +87,21 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textSecondary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Text(
-                    'Tambah Anggaran',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              child: const AppPageHeader(
+                title: 'Tambah Anggaran',
+                showBackButton: true,
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Kategori',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: AppColors.textSecondaryOf(context),
                         fontWeight: FontWeight.w400,
                         fontSize: 11,
                         height: 1.4,
@@ -89,10 +111,13 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                     Wrap(
                       spacing: AppSpacing.md,
                       runSpacing: AppSpacing.md,
-                      children: _categories.map((cat) {
-                        final isSelected = _selectedCategory == cat.name;
+                      children: categoryOptions.map((cat) {
+                        final isSelected = _selectedCategoryId == cat.id;
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedCategory = cat.name),
+                          onTap: () => setState(() {
+                            _selectedCategoryId = cat.id;
+                            _selectedCategoryName = cat.name;
+                          }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md,
@@ -101,8 +126,10 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.primaryLight
-                                  : AppColors.bgSecondary,
-                              borderRadius: BorderRadius.circular(AppRadius.full),
+                                  : AppColors.bgSecondaryOf(context),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.full,
+                              ),
                               border: Border.all(
                                 color: isSelected
                                     ? AppColors.primaryColor
@@ -117,7 +144,7 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                                   cat.icon,
                                   color: isSelected
                                       ? AppColors.primaryColor
-                                      : AppColors.textSecondary,
+                                      : AppColors.textSecondaryOf(context),
                                   size: 16,
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
@@ -126,7 +153,7 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                                   style: TextStyle(
                                     color: isSelected
                                         ? AppColors.primaryColor
-                                        : AppColors.textSecondary,
+                                        : AppColors.textSecondaryOf(context),
                                     fontWeight: isSelected
                                         ? FontWeight.w600
                                         : FontWeight.w400,
@@ -144,10 +171,10 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Limit Nominal',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
+                            color: AppColors.textSecondaryOf(context),
                             fontWeight: FontWeight.w400,
                             fontSize: 11,
                             height: 1.4,
@@ -178,14 +205,14 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                                   fontSize: 28,
                                   height: 1.2,
                                 ),
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
                                   focusedBorder: InputBorder.none,
                                   contentPadding: EdgeInsets.zero,
                                   hintText: '0',
                                   hintStyle: TextStyle(
-                                    color: AppColors.textSecondary,
+                                    color: AppColors.textSecondaryOf(context),
                                     fontWeight: FontWeight.w700,
                                     fontSize: 28,
                                   ),
@@ -194,14 +221,14 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                             ),
                           ],
                         ),
-                        const Divider(color: AppColors.borderColor, height: 1),
+                        Divider(color: AppColors.borderColorOf(context), height: 1),
                       ],
                     ),
                     const SizedBox(height: 32),
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: AppColors.bgTertiary,
+                        color: AppColors.bgTertiaryOf(context),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -242,7 +269,7 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                   color: AppColors.primaryColor,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   child: InkWell(
-                    onTap: () => context.pop(),
+                    onTap: _saveBudget,
                     borderRadius: BorderRadius.circular(AppRadius.lg),
                     child: Container(
                       alignment: Alignment.center,
@@ -266,13 +293,72 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
     );
   }
 
+  Future<void> _saveBudget() async {
+    final amount = double.tryParse(_nominalController.text.trim());
+    if (_selectedCategoryId == null || amount == null || amount <= 0) {
+      await FeedbackDialog.showError<void>(
+        context,
+        title: 'Data belum lengkap',
+        message: 'Pilih kategori dan masukkan limit nominal yang valid.',
+        actionLabel: 'Oke',
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final budget = BudgetEntity(
+      id: const Uuid().v4(),
+      idKategori: _selectedCategoryId!,
+      namaKategori: _selectedCategoryName,
+      limit: amount,
+      period: _isMonthly ? 'monthly' : 'weekly',
+      month: now.month,
+      year: now.year,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: false,
+    );
+
+    try {
+      await ref.read(addBudgetProvider(budget).future);
+      if (mounted) context.pop();
+    } catch (_) {
+      if (!mounted) return;
+      await FeedbackDialog.showError<void>(
+        context,
+        title: 'Gagal menyimpan',
+        message: 'Coba lagi beberapa saat lagi.',
+        actionLabel: 'Oke',
+      );
+    }
+  }
+
+  IconData _iconForName(String name) {
+    return switch (name) {
+      'restaurant' => Icons.restaurant,
+      'directions_car' => Icons.directions_car,
+      'home' => Icons.home,
+      'shopping_bag' => Icons.shopping_bag,
+      'payments' => Icons.payments,
+      _ => Icons.category,
+    };
+  }
+
+  Color _colorForHex(String hex) {
+    try {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return AppColors.textSecondaryOf(context);
+    }
+  }
+
   Widget _buildToggleButton({
     required String label,
     required bool isActive,
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
+      color: isActive ? AppColors.bgPrimaryOf(context) : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       elevation: isActive ? 1 : 0,
       child: InkWell(
@@ -284,7 +370,9 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : AppColors.textSecondaryOf(context),
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               height: 1.4,

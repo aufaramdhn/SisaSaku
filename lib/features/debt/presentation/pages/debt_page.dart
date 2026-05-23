@@ -1,74 +1,32 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
-import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/features/debt/domain/entities/debt_entity.dart';
+import 'package:sisasaku/features/debt/presentation/providers/debt_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
-class DebtPage extends StatefulWidget {
+class DebtPage extends ConsumerStatefulWidget {
   const DebtPage({super.key});
 
   @override
-  State<DebtPage> createState() => _DebtPageState();
+  ConsumerState<DebtPage> createState() => _DebtPageState();
 }
 
-class _DebtPageState extends State<DebtPage> {
+class _DebtPageState extends ConsumerState<DebtPage> {
   String _filter = 'i_owe';
-
-  final _dummyDebts = const [
-    _DebtItem(
-      id: '1',
-      person: 'Andi Pratama',
-      amount: 250000,
-      date: '10 Okt 2023',
-      notes: 'Pinjam buat beli headset',
-      isIOwe: true,
-      isSettled: false,
-    ),
-    _DebtItem(
-      id: '2',
-      person: 'Budi Santoso',
-      amount: 100000,
-      date: '5 Okt 2023',
-      notes: 'Pinjam uang transport',
-      isIOwe: true,
-      isSettled: true,
-    ),
-    _DebtItem(
-      id: '3',
-      person: 'Citra Lestari',
-      amount: 500000,
-      date: '12 Okt 2023',
-      notes: 'Citra pinjam buat kos',
-      isIOwe: false,
-      isSettled: false,
-    ),
-    _DebtItem(
-      id: '4',
-      person: 'Dewi Kusuma',
-      amount: 150000,
-      date: '1 Okt 2023',
-      notes: 'Pinjam buat beli buku',
-      isIOwe: false,
-      isSettled: true,
-    ),
-  ];
+  final Set<String> _settlingIds = {};
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _dummyDebts.where((d) {
-      if (_filter == 'i_owe') return d.isIOwe;
-      return !d.isIOwe;
-    }).toList();
-
-    final totalUnpaid = filtered
-        .where((d) => !d.isSettled)
-        .fold<double>(0, (s, d) => s + d.amount);
+    final debtsAsync = ref.watch(debtsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Stack(
         children: [
           Positioned(
@@ -81,117 +39,111 @@ class _DebtPageState extends State<DebtPage> {
                 height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withValues(alpha: 0.4),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -40,
-            right: -40,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 35, sigmaY: 35),
-              child: Container(
-                width: 250,
-                height: 250,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.dangerColor.withValues(alpha: 0.06),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.4),
                 ),
               ),
             ),
           ),
           SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: AppSpacing.xl),
-                  _buildSummaryCard(totalUnpaid),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildToggleTabs(),
-                  const SizedBox(height: AppSpacing.lg),
-                  if (filtered.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xl2),
-                        child: Column(
-                          children: [
-                            const Icon(
-                              Icons.account_balance_wallet_outlined,
-                              color: AppColors.textSecondary,
-                              size: 48,
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            Text(
-                              _filter == 'i_owe'
-                                  ? 'Belum ada hutang'
-                                  : 'Belum ada piutang',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
+            child: debtsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Gagal memuat data: $err')),
+              data: (debts) {
+                final filtered = debts.where((d) => d.type == _filter).toList();
+                final totalUnpaid = filtered
+                    .where((d) => !d.isSettled)
+                    .fold<double>(0, (s, d) => s + d.amount);
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppPageHeader(
+                        title: 'Hutang & Piutang',
+                        showBackButton: true,
                       ),
-                    )
-                  else
-                    ...filtered.map((item) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: _buildDebtCard(item),
-                        )),
-                ],
-              ),
+                      const SizedBox(height: AppSpacing.xl),
+                      _buildSummaryCard(totalUnpaid),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildToggleTabs(),
+                      const SizedBox(height: AppSpacing.lg),
+                      if (filtered.isEmpty)
+                        _buildEmptyState()
+                      else
+                        ...filtered.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.md,
+                            ),
+                            child: Dismissible(
+                              key: ValueKey(item.id),
+                              direction: DismissDirection.endToStart,
+                              background: _deleteBackground(),
+                              confirmDismiss: (_) => FeedbackDialog.showConfirm(
+                                context,
+                                title: 'Hapus Data',
+                                message: 'Data ${item.person} akan dihapus.',
+                                actionLabel: 'Hapus',
+                              ),
+                              onDismissed: (_) =>
+                                  ref.read(deleteDebtProvider(item.id).future),
+                              child: _buildDebtCard(item),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(AppRouter.addDebt),
-        backgroundColor: AppColors.primaryColor,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Tambah',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl2),
+        child: Column(
+          children: [
+            Icon(
+              Icons.account_balance_wallet_outlined,
+              color: context.colors.textSecondary,
+              size: 48,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              _filter == 'i_owe' ? 'Belum ada hutang' : 'Belum ada piutang',
+              style: TextStyle(
+                color: context.colors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textSecondary,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.bgPrimary,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        const Text(
-          'Hutang & Piutang',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
+  Widget _deleteBackground() {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.dangerColor,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: const Icon(Icons.delete_outline, color: Colors.white),
     );
   }
 
@@ -199,8 +151,8 @@ class _DebtPageState extends State<DebtPage> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        color: context.colors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A000000),
@@ -216,9 +168,9 @@ class _DebtPageState extends State<DebtPage> {
             _filter == 'i_owe'
                 ? 'Total Hutang Belum Lunas'
                 : 'Total Piutang Belum Lunas',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
+            style: TextStyle(
+              color: context.colors.textSecondary,
+              fontWeight: FontWeight.w600,
               fontSize: 12,
             ),
           ),
@@ -231,7 +183,6 @@ class _DebtPageState extends State<DebtPage> {
                   : AppColors.warningDark,
               fontWeight: FontWeight.w700,
               fontSize: 24,
-              height: 1.2,
             ),
           ),
         ],
@@ -243,7 +194,7 @@ class _DebtPageState extends State<DebtPage> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.bgTertiary,
+        color: context.colors.bgTertiary,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -273,7 +224,7 @@ class _DebtPageState extends State<DebtPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
+      color: isActive ? context.colors.bgPrimary : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       elevation: isActive ? 1 : 0,
       child: InkWell(
@@ -285,10 +236,11 @@ class _DebtPageState extends State<DebtPage> {
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : context.colors.textSecondary,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
-              height: 1.4,
             ),
           ),
         ),
@@ -296,50 +248,64 @@ class _DebtPageState extends State<DebtPage> {
     );
   }
 
-  Widget _buildDebtCard(_DebtItem item) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+  Future<void> _toggleSettlement(DebtEntity item) async {
+    if (_settlingIds.contains(item.id)) return;
+
+    setState(() => _settlingIds.add(item.id));
+    try {
+      await ref.read(
+        updateDebtSettlementProvider((item.id, !item.isSettled)).future,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _settlingIds.remove(item.id));
+      }
+    }
+  }
+
+  Widget _buildDebtCard(DebtEntity item) {
+    final isSettling = _settlingIds.contains(item.id);
+
+    return Material(
+      color: context.colors.bgPrimary,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: InkWell(
+        onTap: () => _toggleSettlement(item),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border(
+              left: BorderSide(
+                color: item.isSettled
+                    ? AppColors.successColor
+                    : (item.type == 'i_owe'
+                          ? AppColors.dangerColor
+                          : AppColors.warningDark),
+                width: 3,
+              ),
+            ),
           ),
-        ],
-        border: Border(
-          left: BorderSide(
-            color: item.isSettled
-                ? AppColors.successColor
-                : (item.isIOwe ? AppColors.dangerColor : AppColors.warningDark),
-            width: 3,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: item.isSettled
-                      ? AppColors.successLight
-                      : AppColors.bgSecondary,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  item.isIOwe ? Icons.arrow_upward : Icons.arrow_downward,
+              if (isSettling)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(
+                  item.type == 'i_owe'
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
                   color: item.isSettled
                       ? AppColors.successColor
-                      : (item.isIOwe ? AppColors.dangerColor : AppColors.warningDark),
-                  size: 20,
+                      : (item.type == 'i_owe'
+                            ? AppColors.dangerColor
+                            : AppColors.warningDark),
                 ),
-              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -349,120 +315,86 @@ class _DebtPageState extends State<DebtPage> {
                       item.person,
                       style: TextStyle(
                         color: item.isSettled
-                            ? AppColors.textSecondary
-                            : AppColors.textPrimary,
+                            ? context.colors.textSecondary
+                            : context.colors.textPrimary,
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        decoration: item.isSettled ? TextDecoration.lineThrough : null,
+                        decoration: item.isSettled
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      item.date,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w400,
-                        fontSize: 11,
+                      item.notes?.isNotEmpty == true
+                          ? item.notes!
+                          : _formatDate(item.date),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (item.isSettled)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.successLight,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  child: const Text(
-                    'Lunas',
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    CurrencyFormatter.format(item.amount),
                     style: TextStyle(
-                      color: AppColors.successColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 10,
+                      color: item.isSettled
+                          ? context.colors.textSecondary
+                          : context.colors.textPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: item.isIOwe
-                        ? AppColors.dangerLight
-                        : AppColors.warningLight,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  child: Text(
-                    item.isIOwe ? 'Belum Bayar' : 'Menunggu',
-                    style: TextStyle(
-                      color: item.isIOwe
-                          ? AppColors.dangerColor
-                          : AppColors.warningDark,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 10,
+                  const SizedBox(height: 4),
+                  if (isSettling)
+                    Text(
+                      'Memproses...',
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  else
+                    Text(
+                      item.isSettled ? 'Lunas' : 'Tap untuk lunas',
+                      style: TextStyle(
+                        color: item.isSettled
+                            ? AppColors.successColor
+                            : context.colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  item.notes,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                CurrencyFormatter.format(item.amount),
-                style: TextStyle(
-                  color: item.isSettled
-                      ? AppColors.textSecondary
-                      : (item.isIOwe ? AppColors.dangerColor : AppColors.warningDark),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  decoration: item.isSettled ? TextDecoration.lineThrough : null,
-                ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
-}
 
-class _DebtItem {
-  final String id;
-  final String person;
-  final double amount;
-  final String date;
-  final String notes;
-  final bool isIOwe;
-  final bool isSettled;
-
-  const _DebtItem({
-    required this.id,
-    required this.person,
-    required this.amount,
-    required this.date,
-    required this.notes,
-    required this.isIOwe,
-    required this.isSettled,
-  });
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
 }

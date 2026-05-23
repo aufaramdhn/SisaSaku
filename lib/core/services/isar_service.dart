@@ -1,7 +1,10 @@
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sisasaku/features/bill/data/models/bill_model.dart';
+import 'package:sisasaku/features/budget/data/models/budget_model.dart';
 import 'package:sisasaku/features/category/data/models/category_model.dart';
+import 'package:sisasaku/features/debt/data/models/debt_model.dart';
+import 'package:sisasaku/features/splitbill/data/models/split_bill_model.dart';
 import 'package:sisasaku/features/transaction/data/models/transaction_model.dart';
 
 class IsarService {
@@ -21,6 +24,9 @@ class IsarService {
       CategoryModelSchema,
       TransactionModelSchema,
       BillModelSchema,
+      BudgetModelSchema,
+      DebtModelSchema,
+      SplitBillModelSchema,
     ], directory: dir.path);
   }
 

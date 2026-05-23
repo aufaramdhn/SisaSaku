@@ -2,6 +2,7 @@ import 'package:isar/isar.dart';
 import 'package:sisasaku/features/bill/data/models/bill_model.dart';
 import 'package:sisasaku/core/errors/exceptions.dart';
 import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/services/sync_service.dart';
 
 /// Local datasource untuk Bill (Isar)
 class BillLocalDatasource {
@@ -87,6 +88,39 @@ class BillLocalDatasource {
     }
   }
 
+  /// Watch semua tagihan (real-time stream)
+  Stream<List<BillModel>> watchBills() {
+    try {
+      return isar.billModels.where().watch(fireImmediately: true).map((bills) {
+        bills.sort(
+          (a, b) => (a.tanggalJatuhTempo ?? DateTime.now()).compareTo(
+            b.tanggalJatuhTempo ?? DateTime.now(),
+          ),
+        );
+        return bills;
+      });
+    } catch (e) {
+      throw DatabaseException(message: 'Gagal memantau tagihan: $e');
+    }
+  }
+
+  /// Watch tagihan by status (real-time stream)
+  Stream<List<BillModel>> watchBillsByStatus(String status) {
+    try {
+      return isar.billModels.where().watch(fireImmediately: true).map((bills) {
+        final filtered = bills.where((bill) => bill.status == status).toList()
+          ..sort(
+            (a, b) => (a.tanggalJatuhTempo ?? DateTime.now()).compareTo(
+              b.tanggalJatuhTempo ?? DateTime.now(),
+            ),
+          );
+        return filtered;
+      });
+    } catch (e) {
+      throw DatabaseException(message: 'Gagal memantau tagihan: $e');
+    }
+  }
+
   /// Add tagihan
   Future<BillModel> addBill(BillModel bill) async {
     try {
@@ -102,7 +136,12 @@ class BillLocalDatasource {
   /// Update tagihan
   Future<BillModel> updateBill(BillModel bill) async {
     try {
-      final updated = bill.copyWith(updatedAt: DateTime.now());
+      final existing = await getBillById(bill.id ?? '');
+      final updated = bill.copyWith(
+        updatedAt: DateTime.now(),
+        syncStatus: false,
+      );
+      updated.isarId = existing?.isarId ?? bill.isarId;
       await isar.writeTxn(() async {
         await isar.billModels.put(updated);
       });
@@ -138,6 +177,7 @@ class BillLocalDatasource {
     try {
       final bill = await getBillById(id);
       if (bill != null) {
+        await SyncService.queueDelete(SyncService.tableBills, id);
         await isar.writeTxn(() async {
           await isar.billModels.delete(bill.isarId!);
         });

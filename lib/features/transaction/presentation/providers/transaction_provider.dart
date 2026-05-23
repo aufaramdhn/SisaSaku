@@ -22,11 +22,13 @@ final transactionRepositoryProvider = FutureProvider<TransactionRepository>((
 });
 
 /// Provider untuk daftar transaksi
-final transactionsProvider = StreamProvider<List<TransactionEntity>>((
-  ref,
-) async* {
-  final repository = await ref.watch(transactionRepositoryProvider.future);
-  yield await repository.getTransactions();
+final transactionsProvider = StreamProvider<List<TransactionEntity>>((ref) {
+  final repositoryAsync = ref.watch(transactionRepositoryProvider);
+  return repositoryAsync.when(
+    data: (repo) => repo.watchTransactions(),
+    loading: () => Stream.value([]),
+    error: (err, stack) => Stream.error(err, stack),
+  );
 });
 
 /// Provider untuk transaksi by ID
@@ -44,10 +46,16 @@ final monthlyTransactionsProvider =
     StreamProvider.family<List<TransactionEntity>, (int, int)>((
       ref,
       dateRange,
-    ) async* {
-      final repository = await ref.watch(transactionRepositoryProvider.future);
+    ) {
       final (month, year) = dateRange;
-      yield await repository.getMonthlyTransactions(month, year);
+      final startDate = DateTime(year, month, 1);
+      final endDate = DateTime(year, month + 1, 0, 23, 59, 59);
+      final repositoryAsync = ref.watch(transactionRepositoryProvider);
+      return repositoryAsync.when(
+        data: (repo) => repo.watchTransactionsByDateRange(startDate, endDate),
+        loading: () => Stream.value([]),
+        error: (err, stack) => Stream.error(err, stack),
+      );
     });
 
 /// Provider untuk total pemasukan bulan ini

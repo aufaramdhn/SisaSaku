@@ -1,4 +1,5 @@
 import 'package:isar/isar.dart';
+import 'package:sisasaku/core/services/sync_service.dart';
 import 'package:sisasaku/features/category/data/models/category_model.dart';
 import 'package:sisasaku/core/errors/exceptions.dart';
 
@@ -41,7 +42,10 @@ class CategoryLocalDatasource {
   /// Update kategori
   Future<CategoryModel> updateCategory(CategoryModel category) async {
     try {
-      final updated = category.copyWith(updatedAt: DateTime.now());
+      final updated = category.copyWith(
+        updatedAt: DateTime.now(),
+        syncStatus: false,
+      );
       await isar.writeTxn(() async {
         await isar.categoryModels.put(updated);
       });
@@ -59,6 +63,7 @@ class CategoryLocalDatasource {
           .idEqualTo(id)
           .findFirst();
       if (category != null) {
+        await SyncService.queueDelete(SyncService.tableCategories, id);
         await isar.writeTxn(() async {
           await isar.categoryModels.delete(category.isarId!);
         });
@@ -89,6 +94,15 @@ class CategoryLocalDatasource {
       }
     } catch (e) {
       throw DatabaseException(message: 'Gagal mensinkronisasi kategori: $e');
+    }
+  }
+
+  /// Watch semua kategori (real-time stream)
+  Stream<List<CategoryModel>> watchCategories() {
+    try {
+      return isar.categoryModels.where().watch(fireImmediately: true);
+    } catch (e) {
+      throw DatabaseException(message: 'Gagal memantau kategori: $e');
     }
   }
 }

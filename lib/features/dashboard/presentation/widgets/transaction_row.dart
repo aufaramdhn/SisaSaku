@@ -27,7 +27,9 @@ class TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isIncome ? AppColors.primaryColor : AppColors.textPrimary;
+    final textColor = isIncome
+        ? AppColors.primaryColor
+        : AppColors.textPrimaryOf(context);
     final nominalText = isIncome
         ? '+${CurrencyFormatter.format(nominal)}'
         : '-${CurrencyFormatter.format(nominal)}';
@@ -43,8 +45,11 @@ class TransactionRow extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             border: showDivider
-                ? const Border(
-                    bottom: BorderSide(color: AppColors.borderColor, width: 0.8),
+                ? Border(
+                    bottom: BorderSide(
+                      color: AppColors.borderColorOf(context),
+                      width: 0.8,
+                    ),
                   )
                 : null,
           ),
@@ -66,8 +71,8 @@ class TransactionRow extends StatelessWidget {
                   children: [
                     Text(
                       kategoriNama,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: AppColors.textPrimaryOf(context),
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                         height: 1.4,
@@ -76,8 +81,8 @@ class TransactionRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       waktu,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        color: AppColors.textSecondaryOf(context),
                         fontWeight: FontWeight.w400,
                         fontSize: 11,
                         height: 1.4,

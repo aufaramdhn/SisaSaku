@@ -11,6 +11,8 @@ class MainShell extends StatelessWidget {
   const MainShell({super.key, required this.child});
 
   int _getCurrentIndex(String location) {
+    if (location.startsWith('/budget')) return -1;
+    if (location.startsWith('/debt')) return -1;
     if (location.startsWith('/analytics')) return 1;
     if (location.startsWith('/bill')) return 3;
     if (location.startsWith('/settings')) return 4;
@@ -35,12 +37,15 @@ class MainShell extends StatelessWidget {
   void _showAddMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.bgPrimary,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          decoration: BoxDecoration(
+            color: AppColors.bgPrimaryOf(context),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(22),
+            ),
           ),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -49,24 +54,25 @@ class MainShell extends StatelessWidget {
             AppSpacing.xl,
           ),
           child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.borderColor,
+                    color: AppColors.borderColorOf(context),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                const Text(
+                Text(
                   'Tambah Baru',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: AppColors.textPrimaryOf(context),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -95,6 +101,30 @@ class MainShell extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _MenuItem(
+                  icon: Icons.pie_chart_outline,
+                  iconBgColor: AppColors.surfaceVariantOf(context),
+                  iconColor: AppColors.primaryColor,
+                  title: 'Anggaran',
+                  subtitle: 'Tambah batas pengeluaran kategori',
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push(AppRouter.addBudget);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _MenuItem(
+                  icon: Icons.handshake_outlined,
+                  iconBgColor: AppColors.surfaceVariantOf(context),
+                  iconColor: AppColors.primaryColor,
+                  title: 'Hutang & Piutang',
+                  subtitle: 'Catat pinjaman dan pelunasan',
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push(AppRouter.addDebt);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _MenuItem(
                   icon: Icons.groups,
                   iconBgColor: const Color(0xFFE3F2FD),
                   iconColor: AppColors.primaryColor,
@@ -109,8 +139,9 @@ class MainShell extends StatelessWidget {
               ],
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
     );
   }
 
@@ -155,7 +186,7 @@ class _MenuItem extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderColor),
+            border: Border.all(color: AppColors.borderColorOf(context)),
             borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Row(
@@ -176,27 +207,27 @@ class _MenuItem extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: AppColors.textPrimaryOf(context),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
-                        color: AppColors.textSecondary,
+                        color: AppColors.textSecondaryOf(context),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
-                color: AppColors.textSecondary,
+                color: AppColors.textSecondaryOf(context),
                 size: 20,
               ),
             ],

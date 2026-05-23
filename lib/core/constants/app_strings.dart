@@ -9,6 +9,7 @@ abstract class AppStrings {
   static const String navLaporan = 'Laporan';
   static const String navTagihan = 'Tagihan';
   static const String navProfil = 'Profil';
+  static const String navPengaturan = 'Pengaturan';
 
   // Page titles
   static const String analitik = 'Analitik';

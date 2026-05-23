@@ -63,8 +63,8 @@ class BillWarningCard extends StatelessWidget {
               children: [
                 Text(
                   nama,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
+                  style: TextStyle(
+                    color: AppColors.textPrimaryOf(context),
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                     height: 1.4,
@@ -88,8 +88,8 @@ class BillWarningCard extends StatelessWidget {
             children: [
               Text(
                 CurrencyFormatter.format(nominal),
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: AppColors.textPrimaryOf(context),
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                   height: 1.4,

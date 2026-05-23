@@ -2,21 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/features/analytics/presentation/pages/analytics_page.dart';
 import 'package:sisasaku/features/bill/presentation/pages/add_bill_page.dart';
+import 'package:sisasaku/features/bill/presentation/pages/bill_detail_page.dart';
 import 'package:sisasaku/features/bill/presentation/pages/bill_page.dart';
 import 'package:sisasaku/features/bill/presentation/pages/edit_bill_page.dart';
 import 'package:sisasaku/features/category/presentation/pages/add_category_page.dart';
 import 'package:sisasaku/features/category/presentation/pages/category_page.dart';
+import 'package:sisasaku/features/category/presentation/pages/edit_category_page.dart';
 import 'package:sisasaku/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:sisasaku/features/auth/presentation/pages/login_page.dart';
 import 'package:sisasaku/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:sisasaku/features/onboarding/presentation/pages/splash_screen.dart';
 import 'package:sisasaku/features/settings/presentation/pages/cloud_backup_page.dart';
+import 'package:sisasaku/features/settings/presentation/pages/edit_profile_page.dart';
 import 'package:sisasaku/features/settings/presentation/pages/settings_page.dart';
 import 'package:sisasaku/features/budget/presentation/pages/add_budget_page.dart';
 import 'package:sisasaku/features/budget/presentation/pages/budget_page.dart';
 import 'package:sisasaku/features/debt/presentation/pages/add_debt_page.dart';
 import 'package:sisasaku/features/debt/presentation/pages/debt_page.dart';
 import 'package:sisasaku/features/export/presentation/pages/export_page.dart';
+import 'package:sisasaku/features/notification/presentation/pages/notification_detail_page.dart';
+import 'package:sisasaku/features/notification/presentation/pages/notification_page.dart';
 import 'package:sisasaku/features/splitbill/presentation/pages/add_split_bill_page.dart';
 import 'package:sisasaku/features/splitbill/presentation/pages/split_bill_detail_page.dart';
 import 'package:sisasaku/features/splitbill/presentation/pages/split_bill_page.dart';
@@ -34,15 +39,18 @@ class AppRouter {
   static const String analytics = '/analytics';
   static const String bill = '/bill';
   static const String settings = '/settings';
+  static const String editProfile = '/settings/edit-profile';
   static const String login = '/login';
   static const String category = '/category';
   static const String cloudBackup = '/cloud-backup';
   static const String addTransaction = '/add-transaction';
   static const String addBill = '/add-bill';
   static const String addCategory = '/add-category';
+  static const String editCategory = '/category/:id/edit';
   static const String transactionHistory = '/transactions';
   static const String transactionDetail = '/transaction/:id';
   static const String editTransaction = '/transaction/:id/edit';
+  static const String billDetail = '/bill/:id';
   static const String editBill = '/bill/:id/edit';
   static const String budget = '/budget';
   static const String addBudget = '/budget/add';
@@ -52,20 +60,23 @@ class AppRouter {
   static const String exportData = '/export';
   static const String debt = '/debt';
   static const String addDebt = '/debt/add';
+  static const String notifications = '/notifications';
+  static const String notificationDetail = '/notifications/:id';
 
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
-  static final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
+  static final _rootNavigatorKey = GlobalKey<NavigatorState>(
+    debugLabel: 'root',
+  );
+  static final _shellNavigatorKey = GlobalKey<NavigatorState>(
+    debugLabel: 'shell',
+  );
 
   static GoRouter get router => _router;
 
   static final GoRouter _router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: dashboard,
+    initialLocation: splash,
     routes: [
-      GoRoute(
-        path: splash,
-        builder: (context, state) => const SplashScreen(),
-      ),
+      GoRoute(path: splash, builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: onboarding,
         builder: (context, state) => const OnboardingPage(),
@@ -79,13 +90,17 @@ class AppRouter {
         builder: (context, state) => const AddCategoryPage(),
       ),
       GoRoute(
+        path: editCategory,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EditCategoryPage(categoryId: id);
+        },
+      ),
+      GoRoute(
         path: cloudBackup,
         builder: (context, state) => const CloudBackupPage(),
       ),
-      GoRoute(
-        path: login,
-        builder: (context, state) => const LoginPage(),
-      ),
+      GoRoute(path: login, builder: (context, state) => const LoginPage()),
       GoRoute(
         path: addTransaction,
         builder: (context, state) => const AddTransactionPage(),
@@ -94,10 +109,7 @@ class AppRouter {
         path: transactionHistory,
         builder: (context, state) => const TransactionHistoryPage(),
       ),
-      GoRoute(
-        path: addBill,
-        builder: (context, state) => const AddBillPage(),
-      ),
+      GoRoute(path: addBill, builder: (context, state) => const AddBillPage()),
       GoRoute(
         path: transactionDetail,
         builder: (context, state) {
@@ -111,17 +123,6 @@ class AppRouter {
           final id = state.pathParameters['id']!;
           return EditTransactionPage(transactionId: id);
         },
-      ),
-      GoRoute(
-        path: editBill,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return EditBillPage(billId: id);
-        },
-      ),
-      GoRoute(
-        path: budget,
-        builder: (context, state) => const BudgetPage(),
       ),
       GoRoute(
         path: addBudget,
@@ -146,13 +147,21 @@ class AppRouter {
         path: exportData,
         builder: (context, state) => const ExportPage(),
       ),
+      GoRoute(path: addDebt, builder: (context, state) => const AddDebtPage()),
       GoRoute(
-        path: debt,
-        builder: (context, state) => const DebtPage(),
+        path: notifications,
+        builder: (context, state) => const NotificationPage(),
       ),
       GoRoute(
-        path: addDebt,
-        builder: (context, state) => const AddDebtPage(),
+        path: notificationDetail,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return NotificationDetailPage(notificationId: id);
+        },
+      ),
+      GoRoute(
+        path: editProfile,
+        builder: (context, state) => const EditProfilePage(),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -167,8 +176,31 @@ class AppRouter {
             builder: (context, state) => const AnalyticsPage(),
           ),
           GoRoute(
+            path: budget,
+            builder: (context, state) => const BudgetPage(),
+          ),
+          GoRoute(path: debt, builder: (context, state) => const DebtPage()),
+          GoRoute(
             path: bill,
             builder: (context, state) => const BillPage(),
+            routes: [
+              GoRoute(
+                parentNavigatorKey: _rootNavigatorKey,
+                path: ':id',
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return BillDetailPage(billId: id);
+                },
+              ),
+              GoRoute(
+                parentNavigatorKey: _rootNavigatorKey,
+                path: ':id/edit',
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return EditBillPage(billId: id);
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: settings,

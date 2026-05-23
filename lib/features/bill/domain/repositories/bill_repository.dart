@@ -6,11 +6,17 @@ abstract class BillRepository {
   /// Get semua tagihan
   Future<List<BillEntity>> getBills();
 
+  /// Watch semua tagihan (real-time stream)
+  Stream<List<BillEntity>> watchBills();
+
   /// Get tagihan by ID
   Future<BillEntity?> getBillById(String id);
 
   /// Get tagihan by status
   Future<List<BillEntity>> getBillsByStatus(BillStatus status);
+
+  /// Watch tagihan by status (real-time stream)
+  Stream<List<BillEntity>> watchBillsByStatus(BillStatus status);
 
   /// Get tagihan terdekat (upcoming/pending)
   Future<List<BillEntity>> getUpcomingBills({int limit = 5});

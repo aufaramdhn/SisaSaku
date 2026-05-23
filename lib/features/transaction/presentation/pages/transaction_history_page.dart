@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
@@ -12,6 +13,7 @@ import 'package:sisasaku/core/enums.dart';
 import 'package:sisasaku/features/transaction/domain/entities/transaction_entity.dart';
 import 'package:sisasaku/features/transaction/presentation/providers/transaction_provider.dart';
 import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class TransactionHistoryPage extends ConsumerStatefulWidget {
   const TransactionHistoryPage({super.key});
@@ -50,8 +52,18 @@ class _TransactionHistoryPageState
     } else {
       final hari = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
       final bulan = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agu',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des',
       ];
       return '${hari[date.weekday % 7]}, ${date.day} ${bulan[date.month - 1]} ${date.year}';
     }
@@ -61,14 +73,19 @@ class _TransactionHistoryPageState
     try {
       await ref.read(deleteTransactionProvider(id).future);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaksi berhasil dihapus')),
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Transaksi berhasil dihapus',
+          message: 'Data transaksi sudah dihapus dari riwayat.',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus transaksi: $e')),
+        await FeedbackDialog.showError<void>(
+          context,
+          title: 'Gagal menghapus transaksi',
+          message: e.toString(),
+          actionLabel: 'Oke',
         );
       }
     }
@@ -88,7 +105,7 @@ class _TransactionHistoryPageState
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Stack(
         children: [
           Positioned(
@@ -101,7 +118,7 @@ class _TransactionHistoryPageState
                 height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withValues(alpha: 0.4),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.4),
                 ),
               ),
             ),
@@ -159,29 +176,34 @@ class _TransactionHistoryPageState
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppColors.bgPrimary,
+                color: context.colors.bgPrimary,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                  Icon(
+                    Icons.search,
+                    color: context.colors.textSecondary,
+                    size: 20,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: TextField(
                       controller: _searchController,
                       autofocus: true,
-                      onChanged: (value) => setState(() => _searchQuery = value),
-                      decoration: const InputDecoration(
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      decoration: InputDecoration(
                         hintText: 'Cari transaksi...',
                         hintStyle: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: context.colors.textSecondary,
                           fontWeight: FontWeight.w400,
                           fontSize: 14,
                         ),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),
@@ -191,7 +213,11 @@ class _TransactionHistoryPageState
                         _searchController.clear();
                         setState(() => _searchQuery = '');
                       },
-                      child: const Icon(Icons.close, color: AppColors.textSecondary, size: 18),
+                      child: Icon(
+                        Icons.close,
+                        color: context.colors.textSecondary,
+                        size: 18,
+                      ),
                     ),
                 ],
               ),
@@ -224,32 +250,22 @@ class _TransactionHistoryPageState
       children: [
         IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textSecondary,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.bgSecondary,
-          ),
+          icon: Icon(Icons.arrow_back, color: context.colors.textSecondary),
+          style: IconButton.styleFrom(backgroundColor: context.colors.bgSecondary),
         ),
-        const Text(
+        Text(
           'Riwayat Transaksi',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
             height: 1.2,
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
           ),
         ),
         IconButton(
           onPressed: () => setState(() => _isSearching = true),
-          icon: const Icon(
-            Icons.search,
-            color: AppColors.textSecondary,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.bgSecondary,
-          ),
+          icon: Icon(Icons.search, color: context.colors.textSecondary),
+          style: IconButton.styleFrom(backgroundColor: context.colors.bgSecondary),
         ),
       ],
     );
@@ -257,8 +273,18 @@ class _TransactionHistoryPageState
 
   String get _monthLabel {
     final bulan = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return '${bulan[_currentMonth - 1]} $_currentYear';
   }
@@ -292,7 +318,7 @@ class _TransactionHistoryPageState
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: context.colors.bgPrimary,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: const [
           BoxShadow(
@@ -307,25 +333,25 @@ class _TransactionHistoryPageState
         children: [
           IconButton(
             onPressed: _previousMonth,
-            icon: const Icon(
+            icon: Icon(
               Icons.chevron_left,
-              color: AppColors.textSecondary,
+              color: context.colors.textSecondary,
             ),
           ),
           Text(
             _monthLabel,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               height: 1.3,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
           IconButton(
             onPressed: _nextMonth,
-            icon: const Icon(
+            icon: Icon(
               Icons.chevron_right,
-              color: AppColors.textSecondary,
+              color: context.colors.textSecondary,
             ),
           ),
         ],
@@ -349,7 +375,7 @@ class _TransactionHistoryPageState
             ),
             icon: Icons.arrow_downward,
             iconColor: AppColors.successColor,
-            bgColor: AppColors.bgPrimary,
+            bgColor: context.colors.bgPrimary,
           ),
         ),
         const SizedBox(width: AppSpacing.md),
@@ -363,7 +389,7 @@ class _TransactionHistoryPageState
             ),
             icon: Icons.arrow_upward,
             iconColor: AppColors.tertiary,
-            bgColor: AppColors.bgPrimary,
+            bgColor: context.colors.bgPrimary,
           ),
         ),
       ],
@@ -390,7 +416,7 @@ class _TransactionHistoryPageState
                     child: Material(
                       color: _filter == value
                           ? AppColors.primaryColor
-                          : AppColors.bgPrimary,
+                          : context.colors.bgPrimary,
                       borderRadius: BorderRadius.circular(AppRadius.full),
                       child: InkWell(
                         onTap: () => setState(() => _filter = value),
@@ -405,7 +431,7 @@ class _TransactionHistoryPageState
                             border: Border.all(
                               color: _filter == value
                                   ? AppColors.primaryColor
-                                  : AppColors.borderColor,
+                                  : context.colors.borderColor,
                             ),
                           ),
                           child: Text(
@@ -413,7 +439,7 @@ class _TransactionHistoryPageState
                             style: TextStyle(
                               color: _filter == value
                                   ? Colors.white
-                                  : AppColors.textSecondary,
+                                  : context.colors.textSecondary,
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
                               height: 1.4,
@@ -429,7 +455,7 @@ class _TransactionHistoryPageState
         ),
         const SizedBox(width: AppSpacing.sm),
         Material(
-          color: AppColors.bgPrimary,
+          color: context.colors.bgPrimary,
           borderRadius: BorderRadius.circular(AppRadius.full),
           child: InkWell(
             onTap: _showFilterBottomSheet,
@@ -441,16 +467,16 @@ class _TransactionHistoryPageState
               ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppRadius.full),
-                border: Border.all(color: AppColors.borderColor),
+                border: Border.all(color: context.colors.borderColor),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.tune, color: AppColors.textSecondary, size: 16),
-                  SizedBox(width: AppSpacing.xs),
+                  Icon(Icons.tune, color: context.colors.textSecondary, size: 16),
+                  const SizedBox(width: AppSpacing.xs),
                   Text(
                     'Filter',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: context.colors.textSecondary,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                       height: 1.4,
@@ -474,9 +500,9 @@ class _TransactionHistoryPageState
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
-              decoration: const BoxDecoration(
-                color: AppColors.bgPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: context.colors.bgPrimary,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.lg,
@@ -493,16 +519,16 @@ class _TransactionHistoryPageState
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.borderColor,
+                        color: context.colors.borderColor,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  const Text(
+                  Text(
                     'Urutkan',
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                       height: 1.3,
@@ -515,15 +541,23 @@ class _TransactionHistoryPageState
                     children: [
                       _buildSortChip('Terbaru', 'newest', setModalState),
                       _buildSortChip('Terlama', 'oldest', setModalState),
-                      _buildSortChip('Nominal Tertinggi', 'highest', setModalState),
-                      _buildSortChip('Nominal Terendah', 'lowest', setModalState),
+                      _buildSortChip(
+                        'Nominal Tertinggi',
+                        'highest',
+                        setModalState,
+                      ),
+                      _buildSortChip(
+                        'Nominal Terendah',
+                        'lowest',
+                        setModalState,
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  const Text(
+                  Text(
                     'Tipe',
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                       height: 1.3,
@@ -552,8 +586,10 @@ class _TransactionHistoryPageState
                             Navigator.pop(context);
                           },
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            side: const BorderSide(color: AppColors.borderColor),
+                            foregroundColor: context.colors.textSecondary,
+                            side: BorderSide(
+                              color: context.colors.borderColor,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppRadius.lg),
                             ),
@@ -596,7 +632,7 @@ class _TransactionHistoryPageState
   Widget _buildSortChip(String label, String value, StateSetter setModalState) {
     final isActive = _sortBy == value;
     return Material(
-      color: isActive ? AppColors.primaryLight : AppColors.bgSecondary,
+      color: isActive ? AppColors.primaryLight : context.colors.bgSecondary,
       borderRadius: BorderRadius.circular(AppRadius.full),
       child: InkWell(
         onTap: () {
@@ -612,13 +648,15 @@ class _TransactionHistoryPageState
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(
-              color: isActive ? AppColors.primaryColor : AppColors.borderColor,
+              color: isActive ? AppColors.primaryColor : context.colors.borderColor,
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : context.colors.textSecondary,
               fontWeight: FontWeight.w600,
               fontSize: 12,
             ),
@@ -631,7 +669,7 @@ class _TransactionHistoryPageState
   Widget _buildTypeChip(String label, String value, StateSetter setModalState) {
     final isActive = _filter == value;
     return Material(
-      color: isActive ? AppColors.primaryLight : AppColors.bgSecondary,
+      color: isActive ? AppColors.primaryLight : context.colors.bgSecondary,
       borderRadius: BorderRadius.circular(AppRadius.full),
       child: InkWell(
         onTap: () {
@@ -647,13 +685,15 @@ class _TransactionHistoryPageState
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(
-              color: isActive ? AppColors.primaryColor : AppColors.borderColor,
+              color: isActive ? AppColors.primaryColor : context.colors.borderColor,
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : context.colors.textSecondary,
               fontWeight: FontWeight.w600,
               fontSize: 12,
             ),
@@ -678,7 +718,9 @@ class _TransactionHistoryPageState
         var filtered = _filter == 'all'
             ? transactions
             : transactions.where((t) {
-                if (_filter == 'income') return t.jenis == TransactionType.income;
+                if (_filter == 'income') {
+                  return t.jenis == TransactionType.income;
+                }
                 return t.jenis == TransactionType.expense;
               }).toList();
 
@@ -714,8 +756,10 @@ class _TransactionHistoryPageState
               child: Column(
                 children: [
                   Icon(
-                    _searchQuery.isNotEmpty ? Icons.search_off : Icons.receipt_long,
-                    color: AppColors.textSecondary,
+                    _searchQuery.isNotEmpty
+                        ? Icons.search_off
+                        : Icons.receipt_long,
+                    color: context.colors.textSecondary,
                     size: 48,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -723,8 +767,8 @@ class _TransactionHistoryPageState
                     _searchQuery.isNotEmpty
                         ? 'Transaksi tidak ditemukan'
                         : 'Belum ada transaksi',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -752,17 +796,17 @@ class _TransactionHistoryPageState
                 ),
                 child: Text(
                   entry.key,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
-                    color: AppColors.textSecondary,
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: AppColors.bgPrimary,
+                  color: context.colors.bgPrimary,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   boxShadow: const [
                     BoxShadow(
@@ -778,9 +822,14 @@ class _TransactionHistoryPageState
                     children: List.generate(entry.value.length, (index) {
                       final tx = entry.value[index];
                       final cat = categoryMap[tx.idKategori];
-                      final catName = cat?.nama?.toString() ?? 'Tidak diketahui';
-                      final catIcon = CategoryUiHelpers.parseIcon(cat?.ikon?.toString() ?? 'category');
-                      final catColor = CategoryUiHelpers.parseColor(cat?.warna?.toString() ?? '#9CA3AF');
+                      final catName =
+                          cat?.nama?.toString() ?? 'Tidak diketahui';
+                      final catIcon = CategoryUiHelpers.parseIcon(
+                        cat?.ikon?.toString() ?? 'category',
+                      );
+                      final catColor = CategoryUiHelpers.parseColor(
+                        cat?.warna?.toString() ?? '#9CA3AF',
+                      );
                       final isIncome = tx.jenis == TransactionType.income;
 
                       return Dismissible(
@@ -790,10 +839,7 @@ class _TransactionHistoryPageState
                           color: AppColors.dangerColor,
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: AppSpacing.lg),
-                          child: const Icon(
-                            Icons.delete,
-                            color: Colors.white,
-                          ),
+                          child: const Icon(Icons.delete, color: Colors.white),
                         ),
                         onDismissed: (_) => _deleteTransaction(tx.id),
                         child: _TransactionRow(
@@ -805,7 +851,10 @@ class _TransactionHistoryPageState
                           iconColor: catColor,
                           showDivider: index != entry.value.length - 1,
                           onTap: () => context.push(
-                            AppRouter.transactionDetail.replaceAll(':id', tx.id),
+                            AppRouter.transactionDetail.replaceAll(
+                              ':id',
+                              tx.id,
+                            ),
                           ),
                         ),
                       );
@@ -871,8 +920,8 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
                   fontWeight: FontWeight.w400,
                   fontSize: 11,
                   height: 1.4,
@@ -933,7 +982,7 @@ class _TransactionRow extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppColors.bgSecondary,
+                      color: context.colors.bgSecondary,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(icon, color: iconColor, size: 20),
@@ -945,8 +994,8 @@ class _TransactionRow extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                             height: 1.4,
@@ -955,8 +1004,8 @@ class _TransactionRow extends StatelessWidget {
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           category,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
                             fontWeight: FontWeight.w400,
                             fontSize: 11,
                             height: 1.4,
@@ -968,7 +1017,9 @@ class _TransactionRow extends StatelessWidget {
                   Text(
                     '${isIncome ? '+' : '-'} ${CurrencyFormatter.format(amount)}',
                     style: TextStyle(
-                      color: isIncome ? AppColors.successColor : AppColors.tertiary,
+                      color: isIncome
+                          ? AppColors.successColor
+                          : AppColors.tertiary,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                       height: 1.4,
@@ -978,11 +1029,11 @@ class _TransactionRow extends StatelessWidget {
               ),
             ),
             if (showDivider)
-              const Divider(
+              Divider(
                 height: 1,
                 indent: AppSpacing.md,
                 endIndent: AppSpacing.md,
-                color: AppColors.borderColor,
+                color: context.colors.borderColor,
               ),
           ],
         ),

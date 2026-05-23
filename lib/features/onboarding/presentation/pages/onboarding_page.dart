@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/routes/app_router.dart';
@@ -48,12 +49,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
         curve: Curves.easeInOut,
       );
     } else {
-      context.go(AppRouter.dashboard);
+      _completeOnboarding();
     }
   }
 
   void _skip() {
-    context.go(AppRouter.dashboard);
+    _completeOnboarding();
+  }
+
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_is_completed', true);
+    await prefs.setString('onboarding_completed_at', DateTime.now().toIso8601String());
+    if (mounted) {
+      context.go(AppRouter.dashboard);
+    }
   }
 
   @override
@@ -65,7 +75,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.bgSecondaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -108,7 +118,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         decoration: BoxDecoration(
                           color: isActive
                               ? AppColors.primaryColor
-                              : AppColors.surfaceVariant,
+                              : AppColors.surfaceVariantOf(context),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -316,11 +326,11 @@ class _OnboardingSlide extends StatelessWidget {
                   Text(
                     data.title,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
                       height: 1.1,
-                      color: AppColors.textPrimary,
+                      color: AppColors.textPrimaryOf(context),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -329,11 +339,11 @@ class _OnboardingSlide extends StatelessWidget {
                     child: Text(
                       data.description,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
                         height: 1.5,
-                        color: AppColors.textSecondary,
+                        color: AppColors.textSecondaryOf(context),
                       ),
                     ),
                   ),
@@ -420,10 +430,12 @@ class _Onboarding1Illustration extends StatelessWidget {
               shape: BoxShape.circle,
               color: AppColors.primaryLight,
             ),
-            child: const Icon(
-              Icons.account_balance_wallet,
-              color: AppColors.primaryColor,
-              size: 48,
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              width: 100,
+              height: 100,
+              fit: BoxFit.cover,
             ),
           ),
           Positioned(

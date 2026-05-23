@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sisasaku/core/services/notification_service.dart';
 import 'package:sisasaku/core/providers/sync_provider.dart';
 import 'package:sisasaku/features/auth/presentation/providers/auth_providers.dart';
+import 'package:sisasaku/features/security/presentation/providers/security_provider.dart';
 
 class SyncLifecycleListener extends ConsumerStatefulWidget {
   final Widget child;
@@ -22,15 +24,30 @@ class _SyncLifecycleListenerState extends ConsumerState<SyncLifecycleListener>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    _authSubscription = ref.listenManual<AuthState>(
-      authStateProvider,
-      (previous, next) {
+    // Trigger lock screen on initial app launch if PIN is enabled
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _triggerLockScreenIfNeeded();
+    });
+
+    _authSubscription = ref.listenManual<AuthState>(authStateProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.status == AuthStatus.authenticated &&
+          next.status == AuthStatus.unauthenticated) {
+        NotificationService().deactivateRemoteTokenInCloud(
+          userId: previous?.user?.id,
+        );
+      }
       if (next.status == AuthStatus.authenticated) {
         final syncService = ref.read(syncServiceProvider);
         syncService.syncAll();
+        NotificationService().syncRemoteTokenToCloud();
+        ref
+            .read(profileSyncServiceProvider)
+            .syncProfileForCurrentUser(next.user!.id);
       }
-      },
-    );
+    });
   }
 
   @override
@@ -43,7 +60,14 @@ class _SyncLifecycleListenerState extends ConsumerState<SyncLifecycleListener>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    _triggerLockScreenIfNeeded();
     _syncOnResume();
+  }
+
+  void _triggerLockScreenIfNeeded() {
+    final security = ref.read(securityProvider);
+    if (!security.pinEnabled) return;
+    ref.read(securityProvider.notifier).showLockScreen();
   }
 
   Future<void> _syncOnResume() async {
@@ -53,6 +77,10 @@ class _SyncLifecycleListenerState extends ConsumerState<SyncLifecycleListener>
     final syncService = ref.read(syncServiceProvider);
     if (!await syncService.shouldSync()) return;
     await syncService.syncAll();
+    await NotificationService().syncRemoteTokenToCloud();
+    await ref
+        .read(profileSyncServiceProvider)
+        .syncProfileForCurrentUser(authState.user!.id);
   }
 
   @override

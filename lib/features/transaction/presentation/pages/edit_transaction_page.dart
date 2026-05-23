@@ -11,6 +11,7 @@ import 'package:sisasaku/features/category/domain/entities/category_entity.dart'
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
 import 'package:sisasaku/features/transaction/domain/entities/transaction_entity.dart';
 import 'package:sisasaku/features/transaction/presentation/providers/transaction_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class EditTransactionPage extends ConsumerStatefulWidget {
   final String transactionId;
@@ -112,11 +113,17 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
   Future<void> _submit() async {
     final nominal = CurrencyFormatter.parse(_nominalController.text);
     if (nominal <= 0) {
-      _showSnackBar('Nominal harus lebih dari 0');
+      _showErrorDialog(
+        title: 'Nominal belum valid',
+        message: 'Nominal harus lebih dari 0.',
+      );
       return;
     }
     if (_selectedCategoryId == null) {
-      _showSnackBar('Pilih kategori terlebih dahulu');
+      _showErrorDialog(
+        title: 'Kategori belum dipilih',
+        message: 'Silakan pilih kategori terlebih dahulu.',
+      );
       return;
     }
     if (_initialTransaction == null) return;
@@ -138,12 +145,23 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     try {
       await ref.read(updateTransactionProvider(updated).future);
       if (mounted) {
-        _showSnackBar('Transaksi berhasil diperbarui');
-        context.pop();
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Transaksi berhasil diperbarui',
+          message: 'Perubahan data transaksi sudah disimpan.',
+          onAction: () {
+            if (mounted) {
+              context.pop();
+            }
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Gagal memperbarui transaksi: $e');
+        _showErrorDialog(
+          title: 'Gagal memperbarui transaksi',
+          message: e.toString(),
+        );
       }
     } finally {
       if (mounted) {
@@ -152,10 +170,13 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
+  void _showErrorDialog({required String title, required String message}) {
+    FeedbackDialog.showError<void>(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      title: title,
+      message: message,
+      actionLabel: 'Oke',
+    );
   }
 
   @override
@@ -179,22 +200,22 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
   }
 
   Widget _buildLoadingState() {
-    return const Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+    return Scaffold(
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: Center(child: CircularProgressIndicator()),
     );
   }
 
   Widget _buildErrorState(Object err) {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: Center(child: Text('Error: $err')),
     );
   }
 
   Widget _buildMissingState() {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -213,7 +234,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
 
   Widget _buildScaffold(AsyncValue<List<CategoryEntity>> categoriesAsync) {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -226,22 +247,22 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
                 children: [
                   IconButton(
                     onPressed: () => context.pop(),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.arrow_back,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textSecondaryOf(context),
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
+                      backgroundColor: AppColors.bgSecondaryOf(context),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
-                  const Text(
+                  Text(
                     'Edit Transaksi',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
-                      color: AppColors.textPrimary,
+                      color: AppColors.textPrimaryOf(context),
                     ),
                   ),
                 ],
@@ -286,7 +307,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.bgTertiary,
+        color: AppColors.bgTertiaryOf(context),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -319,7 +340,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
+      color: isActive ? AppColors.bgPrimaryOf(context) : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       elevation: isActive ? 1 : 0,
       child: InkWell(
@@ -333,7 +354,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
             children: [
               Icon(
                 icon,
-                color: isActive ? AppColors.tertiary : AppColors.textSecondary,
+                color: isActive ? AppColors.tertiary : AppColors.textSecondaryOf(context),
                 size: 16,
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -342,7 +363,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
                 style: TextStyle(
                   color: isActive
                       ? AppColors.tertiary
-                      : AppColors.textSecondary,
+                      : AppColors.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                   height: 1.4,
@@ -359,10 +380,10 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Nominal',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -393,14 +414,14 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
                   fontSize: 28,
                   height: 1.2,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
                   hintText: '0',
                   hintStyle: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: AppColors.textSecondaryOf(context),
                     fontWeight: FontWeight.w700,
                     fontSize: 28,
                   ),
@@ -413,7 +434,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
             ),
           ],
         ),
-        const Divider(color: AppColors.borderColor, height: 1),
+        Divider(color: AppColors.borderColorOf(context), height: 1),
       ],
     );
   }
@@ -422,10 +443,10 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Tanggal',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -436,31 +457,31 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
           onTap: _pickDate,
           child: Container(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.borderColor)),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.borderColorOf(context))),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.calendar_today_outlined,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textSecondaryOf(context),
                   size: 18,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     _formattedDate,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: AppColors.textPrimaryOf(context),
                       fontWeight: FontWeight.w400,
                       fontSize: 14,
                       height: 1.4,
                     ),
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textSecondaryOf(context),
                   size: 18,
                 ),
               ],
@@ -475,10 +496,10 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Kategori',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -515,7 +536,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.primaryLight
-                          : AppColors.bgSecondary,
+                          : AppColors.bgSecondaryOf(context),
                       borderRadius: BorderRadius.circular(AppRadius.full),
                       border: Border.all(
                         color: isSelected
@@ -538,7 +559,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
                           style: TextStyle(
                             color: isSelected
                                 ? AppColors.primaryColor
-                                : AppColors.textSecondary,
+                                : AppColors.textSecondaryOf(context),
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.w400,
@@ -566,10 +587,10 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'Catatan',
               style: TextStyle(
-                color: AppColors.textSecondary,
+                color: AppColors.textSecondaryOf(context),
                 fontWeight: FontWeight.w400,
                 fontSize: 11,
                 height: 1.4,
@@ -579,7 +600,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
             Text(
               '(opsional)',
               style: TextStyle(
-                color: AppColors.textSecondary.withValues(alpha: 0.6),
+                color: AppColors.textSecondaryOf(context).withValues(alpha: 0.6),
                 fontWeight: FontWeight.w400,
                 fontSize: 11,
                 height: 1.4,
@@ -592,20 +613,20 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
           controller: _catatanController,
           maxLines: 3,
           minLines: 1,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: AppColors.textPrimaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 14,
             height: 1.5,
           ),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
+              borderSide: BorderSide(color: AppColors.borderColorOf(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
+              borderSide: BorderSide(color: AppColors.borderColorOf(context)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
@@ -617,7 +638,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
             ),
             hintText: 'Tambah catatan...',
             hintStyle: TextStyle(
-              color: AppColors.textSecondary,
+              color: AppColors.textSecondaryOf(context),
               fontWeight: FontWeight.w400,
               fontSize: 14,
             ),
@@ -632,7 +653,7 @@ class _EditTransactionPageState extends ConsumerState<EditTransactionPage> {
       width: double.infinity,
       height: 52,
       child: Material(
-        color: _isLoading ? AppColors.textSecondary : AppColors.primaryColor,
+        color: _isLoading ? AppColors.textSecondaryOf(context) : AppColors.primaryColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           onTap: _isLoading ? null : _submit,

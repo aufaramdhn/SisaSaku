@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+__pycache__/
 
 # IntelliJ related
 *.iml
@@ -51,3 +52,20 @@ claude.md
 .antigravity/
 docs/
 .claude/
+.kiro/
+
+# Firebase options (contains API keys loaded from environment)
+lib/firebase_options.dart
+
+# Sensitive platform config and signing files
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+android/key.properties
+key.properties
+android/upload-keystore.jks
+*.jks
+*.keystore
+*.p12
+*.p8
+serviceAccount*.json
+firebase-adminsdk*.json

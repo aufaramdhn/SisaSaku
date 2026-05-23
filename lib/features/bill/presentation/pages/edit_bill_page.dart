@@ -9,6 +9,7 @@ import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/core/utils/date_formatter.dart';
 import 'package:sisasaku/features/bill/domain/entities/bill_entity.dart';
 import 'package:sisasaku/features/bill/presentation/providers/bill_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class EditBillPage extends ConsumerStatefulWidget {
   final String billId;
@@ -162,13 +163,19 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
   Future<void> _submit() async {
     final nama = _namaController.text.trim();
     if (nama.isEmpty) {
-      _showSnackBar('Nama tagihan harus diisi');
+      _showErrorDialog(
+        title: 'Nama tagihan belum diisi',
+        message: 'Silakan isi nama tagihan terlebih dahulu.',
+      );
       return;
     }
 
     final nominal = CurrencyFormatter.parse(_nominalController.text);
     if (nominal <= 0) {
-      _showSnackBar('Nominal harus lebih dari 0');
+      _showErrorDialog(
+        title: 'Nominal belum valid',
+        message: 'Nominal harus lebih dari 0.',
+      );
       return;
     }
 
@@ -208,37 +215,50 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
     try {
       await ref.read(updateBillProvider(updated).future);
 
-      if (_billIsarId != null) {
-        await NotificationService().cancelBillReminder(_billIsarId!);
-      }
-
-      if (shouldSchedule &&
-          status != BillStatus.paid &&
-          waktuPengingat.isAfter(DateTime.now())) {
-        final localDatasource = await ref.read(
-          billLocalDatasourceProvider.future,
-        );
-        final billModel = await localDatasource.getBillById(updated.id);
-        final isarId = billModel?.isarId ?? _billIsarId;
-        if (isarId != null) {
-          await NotificationService().scheduleBillReminder(
-            id: isarId,
-            title: 'Tagihan Mendatang',
-            body:
-                '${updated.nama} - Rp ${CurrencyFormatter.format(updated.nominal ?? 0)} jatuh tempo ${DateFormatter.formatDate(updated.tanggalJatuhTempo)}',
-            scheduledDate: waktuPengingat,
-            payload: updated.id,
-          );
+      try {
+        if (_billIsarId != null) {
+          await NotificationService().cancelBillReminder(_billIsarId!);
         }
+
+        if (shouldSchedule &&
+            status != BillStatus.paid &&
+            waktuPengingat.isAfter(DateTime.now())) {
+          final localDatasource = await ref.read(
+            billLocalDatasourceProvider.future,
+          );
+          final billModel = await localDatasource.getBillById(updated.id);
+          final isarId = billModel?.isarId ?? _billIsarId;
+          if (isarId != null) {
+            await NotificationService().scheduleBillReminder(
+              id: isarId,
+              title: 'Tagihan Mendatang',
+              body:
+                  '${updated.nama} - Rp ${CurrencyFormatter.format(updated.nominal ?? 0)} jatuh tempo ${DateFormatter.formatDate(updated.tanggalJatuhTempo)}',
+              scheduledDate: waktuPengingat,
+              payload: updated.id,
+            );
+          }
+        }
+      } catch (_) {
+        // Notification scheduling should not block bill updates.
       }
 
       if (mounted) {
-        _showSnackBar('Tagihan berhasil diperbarui');
+        await FeedbackDialog.showSuccess<void>(
+          context,
+          title: 'Tagihan berhasil diperbarui',
+          message: 'Perubahan tagihan sudah disimpan.',
+        );
+      }
+      if (mounted) {
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Gagal memperbarui tagihan: $e');
+        _showErrorDialog(
+          title: 'Gagal memperbarui tagihan',
+          message: e.toString(),
+        );
       }
     } finally {
       if (mounted) {
@@ -247,10 +267,13 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
+  void _showErrorDialog({required String title, required String message}) {
+    FeedbackDialog.showError<void>(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      title: title,
+      message: message,
+      actionLabel: 'Oke',
+    );
   }
 
   @override
@@ -265,12 +288,12 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
         _ensureInitialized(bill);
         return _buildScaffold();
       },
-      loading: () => const Scaffold(
-        backgroundColor: AppColors.bgPrimary,
+      loading: () => Scaffold(
+        backgroundColor: AppColors.bgPrimaryOf(context),
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (err, stack) => Scaffold(
-        backgroundColor: AppColors.bgPrimary,
+        backgroundColor: AppColors.bgPrimaryOf(context),
         body: Center(child: Text('Error: $err')),
       ),
     );
@@ -278,7 +301,7 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
 
   Widget _buildMissingState() {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -297,7 +320,7 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
 
   Widget _buildScaffold() {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -306,29 +329,9 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textSecondary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Text(
-                    'Edit Tagihan',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              child: const AppPageHeader(
+                title: 'Edit Tagihan',
+                showBackButton: true,
               ),
             ),
             Expanded(
@@ -384,112 +387,21 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-            height: 1.4,
-          ),
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
-            border: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            enabledBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.borderColor),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-              borderSide: BorderSide(color: AppColors.primaryColor),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            hintText: hint,
-            hintStyle: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
+    return AppModernTextField(
+      controller: controller,
+      label: label,
+      hint: hint,
+      prefixIcon: icon,
+      keyboardType: keyboardType,
     );
   }
 
   Widget _buildDateField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Jatuh Tempo',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        GestureDetector(
-          onTap: _pickDate,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.borderColor),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _formattedDate,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textSecondary,
-                  size: 18,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return AppSelectableField(
+      label: 'Jatuh Tempo',
+      value: _formattedDate,
+      icon: Icons.calendar_today_outlined,
+      onTap: _pickDate,
     );
   }
 
@@ -497,10 +409,10 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Pengingat',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -510,19 +422,19 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderColor),
+            border: Border.all(color: AppColors.borderColorOf(context)),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _pengingat,
               isExpanded: true,
-              icon: const Icon(
+              icon: Icon(
                 Icons.expand_more,
-                color: AppColors.textSecondary,
+                color: AppColors.textSecondaryOf(context),
               ),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                color: AppColors.textPrimaryOf(context),
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
               ),
@@ -546,10 +458,10 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Tipe Tagihan',
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textSecondaryOf(context),
             fontWeight: FontWeight.w400,
             fontSize: 11,
             height: 1.4,
@@ -559,7 +471,7 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppColors.bgTertiary,
+            color: AppColors.bgTertiaryOf(context),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -591,7 +503,7 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
+      color: isActive ? AppColors.bgPrimaryOf(context) : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       elevation: isActive ? 1 : 0,
       child: InkWell(
@@ -605,7 +517,7 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
             style: TextStyle(
               color: isActive
                   ? AppColors.primaryColor
-                  : AppColors.textSecondary,
+                  : AppColors.textSecondaryOf(context),
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               height: 1.4,
@@ -621,7 +533,7 @@ class _EditBillPageState extends ConsumerState<EditBillPage> {
       width: double.infinity,
       height: 52,
       child: Material(
-        color: _isLoading ? AppColors.textSecondary : AppColors.primaryColor,
+        color: _isLoading ? AppColors.textSecondaryOf(context) : AppColors.primaryColor,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           onTap: _isLoading ? null : _submit,

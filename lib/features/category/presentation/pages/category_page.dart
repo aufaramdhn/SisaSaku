@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/features/category/domain/entities/category_entity.dart';
 import 'package:sisasaku/features/category/presentation/providers/category_provider.dart';
 import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class CategoryPage extends ConsumerStatefulWidget {
   const CategoryPage({super.key});
@@ -25,7 +27,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Stack(
         children: [
           Positioned(
@@ -38,7 +40,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                 height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryLight.withValues(alpha: 0.4),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.4),
                 ),
               ),
             ),
@@ -55,30 +57,11 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                       AppSpacing.lg,
                       AppSpacing.md,
                     ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => context.pop(),
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: AppColors.textSecondary,
-                          ),
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.primaryLight.withValues(
-                              alpha: 0.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Text(
-                          AppStrings.appName,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primaryColor,
-                              ),
-                        ),
-                      ],
+                    child: const AppPageHeader(
+                      title: 'Kategori Transaksi',
+                      subtitle:
+                          'Atur kategori untuk pencatatan keuangan yang lebih rapi.',
+                      showBackButton: true,
                     ),
                   ),
                 ),
@@ -90,26 +73,6 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Kategori Transaksi',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            height: 1.1,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        const Text(
-                          'Atur kategori untuk pencatatan keuangan yang lebih rapi dan presisi.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            height: 1.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
                         _buildToggle(),
                         const SizedBox(height: AppSpacing.xl),
                       ],
@@ -147,7 +110,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                           final category = filtered[index];
                           return _CategoryCard(
                             category: category,
-                            onEdit: () {},
+                            onEdit: () {
+                              context.push('/category/${category.id}/edit');
+                            },
+                            onDelete: () => _confirmDeleteCategory(category),
                           );
                         }, childCount: filtered.length + 1),
                       );
@@ -175,7 +141,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xs),
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
+        color: context.colors.surfaceVariant,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
@@ -203,6 +169,38 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     final incomeNames = ['gaji', 'bonus', 'investasi', 'hadiah', 'penjualan'];
     return incomeNames.contains(nama.toLowerCase());
   }
+
+  Future<void> _confirmDeleteCategory(CategoryEntity category) async {
+    final confirmed = await FeedbackDialog.showConfirm(
+      context,
+      title: 'Hapus Kategori',
+      message: 'Apakah Anda yakin ingin menghapus kategori "${category.nama}"?',
+      actionLabel: 'Hapus',
+      cancelLabel: 'Batal',
+    );
+
+    if (confirmed && mounted) {
+      try {
+        await ref.read(deleteCategoryProvider(category.id).future);
+        if (mounted) {
+          FeedbackDialog.showSuccess<void>(
+            context,
+            title: 'Kategori dihapus',
+            message: 'Kategori "${category.nama}" berhasil dihapus.',
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          FeedbackDialog.showError<void>(
+            context,
+            title: 'Gagal menghapus kategori',
+            message: e.toString(),
+            actionLabel: 'Oke',
+          );
+        }
+      }
+    }
+  }
 }
 
 class _ToggleButton extends StatelessWidget {
@@ -223,7 +221,7 @@ class _ToggleButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.bgPrimary : Colors.transparent,
+          color: isActive ? context.colors.bgPrimary : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           boxShadow: isActive
               ? [
@@ -242,7 +240,7 @@ class _ToggleButton extends StatelessWidget {
             fontSize: isActive ? 14 : 13,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
             height: 1.4,
-            color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+            color: isActive ? context.colors.textPrimary : context.colors.textSecondary,
           ),
         ),
       ),
@@ -253,8 +251,13 @@ class _ToggleButton extends StatelessWidget {
 class _CategoryCard extends StatelessWidget {
   final CategoryEntity category;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _CategoryCard({required this.category, required this.onEdit});
+  const _CategoryCard({
+    required this.category,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   static final Map<String, IconData> _iconMap = {
     'restaurant': Icons.restaurant,
@@ -304,9 +307,9 @@ class _CategoryCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: context.colors.bgPrimary,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.borderColor.withValues(alpha: 0.3)),
+        border: Border.all(color: context.colors.borderColor.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Stack(
@@ -317,7 +320,21 @@ class _CategoryCard extends StatelessWidget {
             child: IconButton(
               onPressed: onEdit,
               icon: const Icon(Icons.edit, size: 18),
-              color: AppColors.textSecondary,
+              color: context.colors.textSecondary,
+              style: IconButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(28, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            child: IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, size: 18),
+              color: AppColors.dangerColor,
               style: IconButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(28, 28),
@@ -341,11 +358,11 @@ class _CategoryCard extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   category.nama,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ],
@@ -373,7 +390,7 @@ class _AddNewCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
-              color: AppColors.borderColor.withValues(alpha: 0.5),
+              color: context.colors.borderColor.withValues(alpha: 0.5),
               style: BorderStyle.solid,
               width: 2,
             ),
@@ -385,23 +402,23 @@ class _AddNewCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.bgTertiary,
+                  color: context.colors.bgTertiary,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.add,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                   size: 24,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              const Text(
+              Text(
                 'Tambah Baru',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   height: 1.4,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
               ),
             ],

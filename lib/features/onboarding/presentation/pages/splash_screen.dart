@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
@@ -40,8 +41,14 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (mounted) {
+    Future.delayed(const Duration(milliseconds: 2500), () async {
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingDone = prefs.getBool('onboarding_is_completed') ?? false;
+      if (!mounted) return;
+      if (onboardingDone) {
+        context.go(AppRouter.dashboard);
+      } else {
         context.go(AppRouter.onboarding);
       }
     });
@@ -56,7 +63,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.bgSecondaryOf(context),
       body: Stack(
         children: [
           Positioned(
@@ -98,16 +105,25 @@ class _SplashScreenState extends State<SplashScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
-                      decoration: const BoxDecoration(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
                         color: AppColors.primaryLight,
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryColor.withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.account_balance_wallet,
-                        color: AppColors.primaryColor,
-                        size: 40,
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        'assets/images/app_icon.png',
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -121,13 +137,13 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    const Text(
+                    Text(
                       AppStrings.appTagline,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
                         height: 1.5,
-                        color: AppColors.textSecondary,
+                        color: AppColors.textSecondaryOf(context),
                       ),
                     ),
                   ],
@@ -139,33 +155,69 @@ class _SplashScreenState extends State<SplashScreen>
             bottom: 100,
             left: 0,
             right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildDot(isActive: false),
-                const SizedBox(width: AppSpacing.sm),
-                _buildDot(isActive: true),
-                const SizedBox(width: AppSpacing.sm),
-                _buildDot(isActive: false),
-              ],
-            ),
+            child: _PulsingDots(animation: _fadeAnimation),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDot({required bool isActive}) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: isActive
-            ? AppColors.primaryColor
-            : AppColors.primaryColor.withValues(alpha: 0.3),
-        shape: BoxShape.circle,
-      ),
+}
+
+class _PulsingDots extends StatefulWidget {
+  final Animation<double> animation;
+
+  const _PulsingDots({required this.animation});
+
+  @override
+  State<_PulsingDots> createState() => _PulsingDotsState();
+}
+
+class _PulsingDotsState extends State<_PulsingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _dotController;
+
+  @override
+  void initState() {
+    super.initState();
+    _dotController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _dotController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _dotController,
+      builder: (context, _) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            final delay = index * 0.2;
+            final value = ((_dotController.value + delay) % 1.0);
+            final opacity = (value < 0.5)
+                ? 0.3 + (value * 2 * 0.7)
+                : 1.0 - ((value - 0.5) * 2 * 0.7);
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withValues(alpha: opacity),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

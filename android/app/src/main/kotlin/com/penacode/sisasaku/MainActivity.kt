@@ -1,4 +1,4 @@
-package com.example.sisasaku
+package com.penacode.sisasaku
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
+import 'package:sisasaku/features/debt/domain/entities/debt_entity.dart';
+import 'package:sisasaku/features/debt/presentation/providers/debt_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
+import 'package:uuid/uuid.dart';
 
-class AddDebtPage extends StatefulWidget {
+class AddDebtPage extends ConsumerStatefulWidget {
   const AddDebtPage({super.key});
 
   @override
-  State<AddDebtPage> createState() => _AddDebtPageState();
+  ConsumerState<AddDebtPage> createState() => _AddDebtPageState();
 }
 
-class _AddDebtPageState extends State<AddDebtPage> {
+class _AddDebtPageState extends ConsumerState<AddDebtPage> {
   bool _isIOwe = true;
   final _personController = TextEditingController();
   final _nominalController = TextEditingController();
@@ -50,7 +55,7 @@ class _AddDebtPageState extends State<AddDebtPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.bgPrimaryOf(context),
       body: SafeArea(
         child: Column(
           children: [
@@ -59,36 +64,14 @@ class _AddDebtPageState extends State<AddDebtPage> {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textSecondary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.bgSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Text(
-                    'Tambah Hutang',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              child: const AppPageHeader(
+                title: 'Tambah Hutang',
+                showBackButton: true,
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -97,7 +80,7 @@ class _AddDebtPageState extends State<AddDebtPage> {
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: AppColors.bgTertiary,
+                        color: AppColors.bgTertiaryOf(context),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -126,12 +109,12 @@ class _AddDebtPageState extends State<AddDebtPage> {
                       controller: _personController,
                       decoration: InputDecoration(
                         hintText: 'Contoh: Andi Pratama',
-                        hintStyle: const TextStyle(
-                          color: AppColors.textSecondary,
+                        hintStyle: TextStyle(
+                          color: AppColors.textSecondaryOf(context),
                           fontWeight: FontWeight.w400,
                         ),
                         filled: true,
-                        fillColor: AppColors.bgSecondary,
+                        fillColor: AppColors.bgSecondaryOf(context),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.lg),
                           borderSide: BorderSide.none,
@@ -169,14 +152,14 @@ class _AddDebtPageState extends State<AddDebtPage> {
                               fontSize: 28,
                               height: 1.2,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
                               contentPadding: EdgeInsets.zero,
                               hintText: '0',
                               hintStyle: TextStyle(
-                                color: AppColors.textSecondary,
+                                color: AppColors.textSecondaryOf(context),
                                 fontWeight: FontWeight.w700,
                                 fontSize: 28,
                               ),
@@ -185,12 +168,12 @@ class _AddDebtPageState extends State<AddDebtPage> {
                         ),
                       ],
                     ),
-                    const Divider(color: AppColors.borderColor, height: 1),
+                    Divider(color: AppColors.borderColorOf(context), height: 1),
                     const SizedBox(height: AppSpacing.lg),
                     _buildLabel('Tanggal'),
                     const SizedBox(height: AppSpacing.sm),
                     Material(
-                      color: AppColors.bgSecondary,
+                      color: AppColors.bgSecondaryOf(context),
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                       child: InkWell(
                         onTap: _pickDate,
@@ -205,24 +188,24 @@ class _AddDebtPageState extends State<AddDebtPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.calendar_today,
-                                color: AppColors.textSecondary,
+                                color: AppColors.textSecondaryOf(context),
                                 size: 18,
                               ),
                               const SizedBox(width: AppSpacing.sm),
                               Text(
                                 '${_selectedDate.day} ${_monthName(_selectedDate.month)} ${_selectedDate.year}',
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
+                                style: TextStyle(
+                                  color: AppColors.textPrimaryOf(context),
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
                               ),
                               const Spacer(),
-                              const Icon(
+                              Icon(
                                 Icons.chevron_right,
-                                color: AppColors.textSecondary,
+                                color: AppColors.textSecondaryOf(context),
                                 size: 18,
                               ),
                             ],
@@ -238,12 +221,12 @@ class _AddDebtPageState extends State<AddDebtPage> {
                       maxLines: 3,
                       decoration: InputDecoration(
                         hintText: 'Tambahkan catatan...',
-                        hintStyle: const TextStyle(
-                          color: AppColors.textSecondary,
+                        hintStyle: TextStyle(
+                          color: AppColors.textSecondaryOf(context),
                           fontWeight: FontWeight.w400,
                         ),
                         filled: true,
-                        fillColor: AppColors.bgSecondary,
+                        fillColor: AppColors.bgSecondaryOf(context),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.lg),
                           borderSide: BorderSide.none,
@@ -270,7 +253,7 @@ class _AddDebtPageState extends State<AddDebtPage> {
                   color: AppColors.primaryColor,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   child: InkWell(
-                    onTap: () => context.pop(),
+                    onTap: _saveDebt,
                     borderRadius: BorderRadius.circular(AppRadius.lg),
                     child: Container(
                       alignment: Alignment.center,
@@ -294,11 +277,52 @@ class _AddDebtPageState extends State<AddDebtPage> {
     );
   }
 
+  Future<void> _saveDebt() async {
+    final person = _personController.text.trim();
+    final amount = double.tryParse(_nominalController.text.trim());
+    if (person.isEmpty || amount == null || amount <= 0) {
+      await FeedbackDialog.showError<void>(
+        context,
+        title: 'Data belum lengkap',
+        message: 'Isi nama orang dan nominal yang valid.',
+        actionLabel: 'Oke',
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final debt = DebtEntity(
+      id: const Uuid().v4(),
+      person: person,
+      amount: amount,
+      date: _selectedDate,
+      notes: _notesController.text.trim(),
+      type: _isIOwe ? 'i_owe' : 'they_owe',
+      isSettled: false,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: false,
+    );
+
+    try {
+      await ref.read(addDebtProvider(debt).future);
+      if (mounted) context.pop();
+    } catch (_) {
+      if (!mounted) return;
+      await FeedbackDialog.showError<void>(
+        context,
+        title: 'Gagal menyimpan',
+        message: 'Coba lagi beberapa saat lagi.',
+        actionLabel: 'Oke',
+      );
+    }
+  }
+
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: const TextStyle(
-        color: AppColors.textSecondary,
+      style: TextStyle(
+        color: AppColors.textSecondaryOf(context),
         fontWeight: FontWeight.w400,
         fontSize: 11,
         height: 1.4,
@@ -312,7 +336,7 @@ class _AddDebtPageState extends State<AddDebtPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isActive ? AppColors.bgPrimary : Colors.transparent,
+      color: isActive ? AppColors.bgPrimaryOf(context) : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       elevation: isActive ? 1 : 0,
       child: InkWell(
@@ -324,7 +348,9 @@ class _AddDebtPageState extends State<AddDebtPage> {
           child: Text(
             label,
             style: TextStyle(
-              color: isActive ? AppColors.primaryColor : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.primaryColor
+                  : AppColors.textSecondaryOf(context),
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               height: 1.4,
@@ -337,8 +363,19 @@ class _AddDebtPageState extends State<AddDebtPage> {
 
   String _monthName(int month) {
     const names = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     return names[month];
   }

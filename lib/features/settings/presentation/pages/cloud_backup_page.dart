@@ -8,7 +8,11 @@ import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/constants/app_strings.dart';
 import 'package:sisasaku/core/constants/supabase_config.dart';
 import 'package:sisasaku/core/providers/sync_provider.dart';
+import 'package:sisasaku/core/services/local_preferences_service.dart';
+import 'package:sisasaku/core/services/sync_service.dart';
 import 'package:sisasaku/features/auth/presentation/providers/auth_providers.dart';
+import 'package:sisasaku/features/settings/presentation/providers/profile_provider.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class CloudBackupPage extends ConsumerWidget {
   const CloudBackupPage({super.key});
@@ -16,10 +20,11 @@ class CloudBackupPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final syncStatusAsync = ref.watch(syncStatusProvider);
     final isGuest = authState.status == AuthStatus.unauthenticated;
 
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.bgSecondaryOf(context),
       body: Stack(
         children: [
           Positioned(
@@ -50,13 +55,24 @@ class CloudBackupPage extends ConsumerWidget {
                 children: [
                   _buildHeader(context),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildStatusCard(isGuest),
+                  _buildStatusCard(context, isGuest, syncStatusAsync.valueOrNull),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildHeroSection(),
+                  _buildHeroSection(context),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildBenefitsList(),
+                  _buildBenefitsList(context),
                   const SizedBox(height: AppSpacing.xl),
-                  _buildActionButtons(context, ref, isGuest),
+                  _buildActionButtons(
+                    context,
+                    ref,
+                    isGuest,
+                    syncStatusAsync.valueOrNull,
+                  ),
+                  _buildResolveConflictButton(
+                    context,
+                    ref,
+                    isGuest,
+                    syncStatusAsync.valueOrNull,
+                  ),
                 ],
               ),
             ),
@@ -71,9 +87,9 @@ class CloudBackupPage extends ConsumerWidget {
       children: [
         IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary),
+          icon: Icon(Icons.arrow_back, color: AppColors.textSecondaryOf(context)),
           style: IconButton.styleFrom(
-            backgroundColor: AppColors.primaryLight.withValues(alpha: 0.5),
+            backgroundColor: AppColors.decorativeBlurOf(context, alpha: 0.5),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -88,12 +104,48 @@ class CloudBackupPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusCard(bool isGuest) {
+  Widget _buildStatusCard(
+    BuildContext context,
+    bool isGuest,
+    SyncStatusSnapshot? syncStatus,
+  ) {
+    final hasError = (syncStatus?.lastError?.isNotEmpty ?? false) && !isGuest;
+    final hasPending = (syncStatus?.pendingChangeCount ?? 0) > 0 && !isGuest;
+    final hasConflict = (syncStatus?.conflictCount ?? 0) > 0 && !isGuest;
+    final isSynced =
+        !isGuest &&
+        !hasError &&
+        !hasPending &&
+        !hasConflict &&
+        syncStatus?.lastSyncAt != null;
+    final badgeLabel = isGuest
+        ? 'Nonaktif'
+        : hasError
+        ? 'Bermasalah'
+        : hasConflict
+        ? 'Konflik'
+        : hasPending
+        ? 'Pending'
+        : isSynced
+        ? 'Tersinkron'
+        : 'Aktif';
+    final subtitle = isGuest
+        ? 'Data tersimpan lokal'
+        : hasError
+        ? 'Sinkronisasi terakhir gagal. Periksa koneksi dan coba lagi.'
+        : hasConflict
+        ? '${syncStatus?.conflictCount ?? 0} data bentrok. Versi cloud yang lebih baru dipakai agar data tetap konsisten.'
+        : hasPending
+        ? '${syncStatus?.pendingChangeCount ?? 0} perubahan menunggu sinkronisasi.'
+        : syncStatus?.lastSyncAt != null
+        ? 'Terakhir sinkron ${_formatSyncTime(syncStatus!.lastSyncAt!)}'
+        : 'Cloud backup siap digunakan.';
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bgPrimary,
+        color: AppColors.bgPrimaryOf(context),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.borderColor.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.borderColorOf(context).withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
@@ -101,8 +153,8 @@ class CloudBackupPage extends ConsumerWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(
-              color: AppColors.bgPrimary,
+            decoration: BoxDecoration(
+              color: AppColors.bgPrimaryOf(context),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
@@ -113,8 +165,24 @@ class CloudBackupPage extends ConsumerWidget {
               ],
             ),
             child: Icon(
-              isGuest ? Icons.cloud_off : Icons.cloud_done,
-              color: isGuest ? AppColors.textSecondary : AppColors.successColor,
+              isGuest
+                  ? Icons.cloud_off
+                  : hasError
+                  ? Icons.cloud_off_outlined
+                  : hasConflict
+                  ? Icons.merge_type_rounded
+                  : hasPending
+                  ? Icons.cloud_upload_outlined
+                  : Icons.cloud_done,
+              color: isGuest
+                  ? AppColors.textSecondaryOf(context)
+                  : hasError
+                  ? AppColors.dangerColor
+                  : hasConflict
+                  ? AppColors.warningDark
+                  : hasPending
+                  ? AppColors.warningDark
+                  : AppColors.successColor,
               size: 22,
             ),
           ),
@@ -123,23 +191,23 @@ class CloudBackupPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Status Pencadangan',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     height: 1.3,
-                    color: AppColors.textPrimary,
+                    color: AppColors.textPrimaryOf(context),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isGuest ? 'Data tersimpan lokal' : 'Data tersinkronisasi',
-                  style: const TextStyle(
+                  subtitle,
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
                     height: 1.5,
-                    color: AppColors.textSecondary,
+                    color: AppColors.textSecondaryOf(context),
                   ),
                 ),
               ],
@@ -151,16 +219,16 @@ class CloudBackupPage extends ConsumerWidget {
               vertical: AppSpacing.xs,
             ),
             decoration: BoxDecoration(
-              color: AppColors.bgTertiary,
+              color: AppColors.bgTertiaryOf(context),
               borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Text(
-              isGuest ? 'Nonaktif' : 'Aktif',
-              style: const TextStyle(
+              badgeLabel,
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
                 height: 1.4,
-                color: AppColors.textSecondary,
+                color: AppColors.textSecondaryOf(context),
               ),
             ),
           ),
@@ -169,14 +237,14 @@ class CloudBackupPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeroSection() {
+  Widget _buildHeroSection(BuildContext context) {
     return Column(
       children: [
         Container(
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: AppColors.primaryLight.withValues(alpha: 0.5),
+            color: AppColors.decorativeBlurOf(context, alpha: 0.5),
             shape: BoxShape.circle,
           ),
           child: Stack(
@@ -193,8 +261,8 @@ class CloudBackupPage extends ConsumerWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.bgPrimary,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgPrimaryOf(context),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -205,8 +273,8 @@ class CloudBackupPage extends ConsumerWidget {
                 child: Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
-                    color: AppColors.bgPrimary,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgPrimaryOf(context),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -225,7 +293,7 @@ class CloudBackupPage extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: Text(
             'Masuk untuk mencadangkan data keuanganmu ke cloud. Nikmati akses mudah dari mana saja dan keamanan ekstra.',
@@ -234,7 +302,7 @@ class CloudBackupPage extends ConsumerWidget {
               fontSize: 13,
               fontWeight: FontWeight.w400,
               height: 1.5,
-              color: AppColors.textSecondary,
+              color: AppColors.textSecondaryOf(context),
             ),
           ),
         ),
@@ -242,7 +310,7 @@ class CloudBackupPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildBenefitsList() {
+  Widget _buildBenefitsList(BuildContext context) {
     final benefits = [
       _BenefitData(
         icon: Icons.verified_user,
@@ -263,10 +331,10 @@ class CloudBackupPage extends ConsumerWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
           decoration: BoxDecoration(
-            color: AppColors.bgPrimary.withValues(alpha: 0.8),
+            color: AppColors.bgPrimaryOf(context).withValues(alpha: 0.8),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
-              color: AppColors.borderColor.withValues(alpha: 0.3),
+              color: AppColors.borderColorOf(context).withValues(alpha: 0.3),
             ),
           ),
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -277,7 +345,7 @@ class CloudBackupPage extends ConsumerWidget {
                 margin: const EdgeInsets.only(top: 2),
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight.withValues(alpha: 0.3),
+                  color: AppColors.decorativeBlurOf(context, alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -293,21 +361,21 @@ class CloudBackupPage extends ConsumerWidget {
                   children: [
                     Text(
                       b.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         height: 1.4,
-                        color: AppColors.textPrimary,
+                        color: AppColors.textPrimaryOf(context),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       b.description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
                         height: 1.5,
-                        color: AppColors.textSecondary,
+                        color: AppColors.textSecondaryOf(context),
                       ),
                     ),
                   ],
@@ -324,6 +392,7 @@ class CloudBackupPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     bool isGuest,
+    SyncStatusSnapshot? syncStatus,
   ) {
     return Column(
       children: [
@@ -334,10 +403,12 @@ class CloudBackupPage extends ConsumerWidget {
             onPressed: isGuest
                 ? () async {
                     if (!SupabaseConfig.isConfigured) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Supabase belum dikonfigurasi.'),
-                        ),
+                      await FeedbackDialog.showError<void>(
+                        context,
+                        title: 'Supabase belum dikonfigurasi',
+                        message:
+                            'Lengkapi konfigurasi Supabase sebelum memakai backup cloud.',
+                        actionLabel: 'Oke',
                       );
                       return;
                     }
@@ -346,28 +417,32 @@ class CloudBackupPage extends ConsumerWidget {
                       await ref
                           .read(authStateProvider.notifier)
                           .signInWithGoogle();
+                      ref.read(syncStatusRefreshProvider.notifier).state++;
                     } catch (_) {
                       if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Login gagal. Coba lagi.')),
+                      await FeedbackDialog.showError<void>(
+                        context,
+                        title: 'Login gagal',
+                        message: 'Coba lagi beberapa saat lagi.',
+                        actionLabel: 'Oke',
                       );
                     }
                   }
                 : null,
             icon: _GoogleIcon(),
-            label: const Text(
+            label: Text(
               'Lanjutkan dengan Google',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.4,
-                color: AppColors.textPrimary,
+                color: AppColors.textPrimaryOf(context),
               ),
             ),
             style: OutlinedButton.styleFrom(
-              backgroundColor: AppColors.bgPrimary,
+              backgroundColor: AppColors.bgPrimaryOf(context),
               side: BorderSide(
-                color: AppColors.borderColor.withValues(alpha: 0.5),
+                color: AppColors.borderColorOf(context).withValues(alpha: 0.5),
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -381,25 +456,40 @@ class CloudBackupPage extends ConsumerWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: () async {
-                try {
-                  await ref.read(syncServiceProvider).syncAll();
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Sinkronisasi selesai.')),
-                  );
-                } catch (_) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Gagal sinkronisasi. Coba lagi.'),
-                    ),
-                  );
-                }
-              },
+              onPressed: syncStatus?.isSyncing == true
+                  ? null
+                  : () async {
+                      try {
+                        await ref.read(syncServiceProvider).syncAll();
+                        final user = ref.read(authStateProvider).user;
+                        if (user != null) {
+                          await ref
+                              .read(profileSyncServiceProvider)
+                              .syncProfileForCurrentUser(user.id);
+                          ref.read(profileRefreshProvider.notifier).state++;
+                        }
+                        ref.read(syncStatusRefreshProvider.notifier).state++;
+                        if (!context.mounted) return;
+                        await FeedbackDialog.showSuccess<void>(
+                          context,
+                          title: 'Sinkronisasi selesai',
+                          message: 'Data lokal dan cloud sudah diperbarui.',
+                        );
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        await FeedbackDialog.showError<void>(
+                          context,
+                          title: 'Gagal sinkronisasi',
+                          message: 'Coba lagi beberapa saat lagi.',
+                          actionLabel: 'Oke',
+                        );
+                      }
+                    },
               icon: const Icon(Icons.sync, size: 20),
-              label: const Text(
-                'Sinkronkan Sekarang',
+              label: Text(
+                syncStatus?.isSyncing == true
+                    ? 'Menyinkronkan...'
+                    : 'Sinkronkan Sekarang',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -419,6 +509,69 @@ class CloudBackupPage extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+
+  String _formatSyncTime(DateTime dateTime) {
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Widget _buildResolveConflictButton(
+    BuildContext context,
+    WidgetRef ref,
+    bool isGuest,
+    SyncStatusSnapshot? syncStatus,
+  ) {
+    final hasConflict = (syncStatus?.conflictCount ?? 0) > 0 && !isGuest;
+    if (!hasConflict) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              await LocalPreferencesService.clearAllSyncConflicts();
+              await ref.read(syncServiceProvider).syncAll();
+              ref.read(syncStatusRefreshProvider.notifier).state++;
+              if (!context.mounted) return;
+              await FeedbackDialog.showSuccess<void>(
+                context,
+                title: 'Konflik diselesaikan',
+                message: 'Semua konflik sinkronisasi telah dibersihkan.',
+              );
+            } catch (_) {
+              if (!context.mounted) return;
+              await FeedbackDialog.showError<void>(
+                context,
+                title: 'Gagal menyelesaikan konflik',
+                message: 'Coba lagi beberapa saat lagi.',
+                actionLabel: 'Oke',
+              );
+            }
+          },
+          icon: const Icon(Icons.merge_type_rounded, size: 20),
+          label: const Text(
+            'Selesaikan Konflik',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.warningDark,
+            side: const BorderSide(color: AppColors.warningDark),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

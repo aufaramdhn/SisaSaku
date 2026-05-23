@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sisasaku/core/constants/app_colors.dart';
 import 'package:sisasaku/core/constants/app_spacing.dart';
 import 'package:sisasaku/core/enums.dart';
+import 'package:sisasaku/core/theme/app_color_extension.dart';
 import 'package:sisasaku/core/utils/category_ui_helpers.dart';
 import 'package:sisasaku/core/utils/currency_formatter.dart';
 import 'package:sisasaku/features/category/domain/entities/category_entity.dart';
@@ -13,6 +14,7 @@ import 'package:sisasaku/features/category/presentation/providers/category_provi
 import 'package:sisasaku/features/transaction/domain/entities/transaction_entity.dart';
 import 'package:sisasaku/features/transaction/presentation/providers/transaction_provider.dart';
 import 'package:sisasaku/routes/app_router.dart';
+import 'package:sisasaku/shared/widgets/ui/ui.dart';
 
 class TransactionDetailPage extends ConsumerWidget {
   final String transactionId;
@@ -48,7 +50,7 @@ class TransactionDetailPage extends ConsumerWidget {
         );
 
         return Scaffold(
-          backgroundColor: AppColors.bgSecondary,
+          backgroundColor: context.colors.bgSecondary,
           body: Stack(
             children: [
               Positioned(
@@ -79,12 +81,12 @@ class TransactionDetailPage extends ConsumerWidget {
                         children: [
                           IconButton(
                             onPressed: () => context.pop(),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.arrow_back,
-                              color: AppColors.textSecondary,
+                              color: context.colors.textSecondary,
                             ),
                             style: IconButton.styleFrom(
-                              backgroundColor: AppColors.bgPrimary,
+                              backgroundColor: context.colors.bgPrimary,
                             ),
                           ),
                           const Spacer(),
@@ -93,7 +95,7 @@ class TransactionDetailPage extends ConsumerWidget {
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
+                                  color: context.colors.textPrimary,
                                 ),
                           ),
                           const Spacer(),
@@ -113,7 +115,7 @@ class TransactionDetailPage extends ConsumerWidget {
                                   color: AppColors.primaryColor,
                                 ),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: AppColors.bgPrimary,
+                                  backgroundColor: context.colors.bgPrimary,
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.xs),
@@ -148,7 +150,7 @@ class TransactionDetailPage extends ConsumerWidget {
                               width: double.infinity,
                               padding: const EdgeInsets.all(AppSpacing.xl),
                               decoration: BoxDecoration(
-                                color: AppColors.bgPrimary,
+                                color: context.colors.bgPrimary,
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.lg,
                                 ),
@@ -164,8 +166,8 @@ class TransactionDetailPage extends ConsumerWidget {
                                 children: [
                                   Text(
                                     isExpense ? 'Pengeluaran' : 'Pemasukan',
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
+                                    style: TextStyle(
+                                      color: context.colors.textSecondary,
                                       fontWeight: FontWeight.w400,
                                       fontSize: 14,
                                     ),
@@ -190,7 +192,7 @@ class TransactionDetailPage extends ConsumerWidget {
                               width: double.infinity,
                               padding: const EdgeInsets.all(AppSpacing.lg),
                               decoration: BoxDecoration(
-                                color: AppColors.bgPrimary,
+                                color: context.colors.bgPrimary,
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.lg,
                                 ),
@@ -205,28 +207,31 @@ class TransactionDetailPage extends ConsumerWidget {
                               child: Column(
                                 children: [
                                   _buildInfoRow(
+                                    context,
                                     icon: categoryIcon,
                                     iconColor: categoryColor,
                                     label: 'Kategori',
                                     value: category?.nama ?? 'Tidak diketahui',
                                   ),
-                                  const Divider(
+                                  Divider(
                                     height: 32,
-                                    color: AppColors.borderColor,
+                                    color: context.colors.borderColor,
                                   ),
                                   _buildInfoRow(
+                                    context,
                                     icon: Icons.calendar_today_outlined,
                                     iconColor: AppColors.primaryColor,
                                     label: 'Tanggal',
                                     value: _formatDate(transaction.tanggal),
                                   ),
-                                  const Divider(
+                                  Divider(
                                     height: 32,
-                                    color: AppColors.borderColor,
+                                    color: context.colors.borderColor,
                                   ),
                                   _buildInfoRow(
+                                    context,
                                     icon: Icons.notes_outlined,
-                                    iconColor: AppColors.textSecondary,
+                                    iconColor: context.colors.textSecondary,
                                     label: 'Catatan',
                                     value:
                                         (transaction.deskripsi?.isNotEmpty ??
@@ -249,12 +254,12 @@ class TransactionDetailPage extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Scaffold(
-        backgroundColor: AppColors.bgSecondary,
-        body: Center(child: CircularProgressIndicator()),
+      loading: () => Scaffold(
+        backgroundColor: context.colors.bgSecondary,
+        body: const Center(child: CircularProgressIndicator()),
       ),
       error: (err, stack) => Scaffold(
-        backgroundColor: AppColors.bgSecondary,
+        backgroundColor: context.colors.bgSecondary,
         body: Center(child: Text('Error: $err')),
       ),
     );
@@ -288,7 +293,7 @@ class TransactionDetailPage extends ConsumerWidget {
 
   Widget _buildMissingState(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: context.colors.bgSecondary,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -305,7 +310,8 @@ class TransactionDetailPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoRow({
+  Widget _buildInfoRow(
+    BuildContext context, {
     required IconData icon,
     required Color iconColor,
     required String label,
@@ -329,8 +335,8 @@ class TransactionDetailPage extends ConsumerWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
                   fontWeight: FontWeight.w400,
                   fontSize: 11,
                   height: 1.4,
@@ -339,8 +345,8 @@ class TransactionDetailPage extends ConsumerWidget {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                   height: 1.4,
@@ -358,53 +364,34 @@ class TransactionDetailPage extends ConsumerWidget {
     WidgetRef ref,
     TransactionEntity transaction,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: const Text(
-          'Hapus Transaksi',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: const Text(
-          'Transaksi akan dihapus permanen. Lanjutkan?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Hapus',
-              style: TextStyle(color: AppColors.dangerColor),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await FeedbackDialog.showConfirm(
+      context,
+      title: 'Hapus Transaksi',
+      message: 'Transaksi akan dihapus permanen. Lanjutkan?',
+      actionLabel: 'Hapus',
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       await ref.read(deleteTransactionProvider(transaction.id).future);
       if (context.mounted) {
-        ScaffoldMessenger.of(
+        await FeedbackDialog.showSuccess<void>(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Transaksi dihapus')));
+          title: 'Transaksi dihapus',
+          message: 'Data transaksi sudah dihapus dari riwayat.',
+        );
+      }
+      if (context.mounted) {
         context.pop();
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus transaksi: $e')),
+        await FeedbackDialog.showError<void>(
+          context,
+          title: 'Gagal menghapus transaksi',
+          message: e.toString(),
+          actionLabel: 'Oke',
         );
       }
     }

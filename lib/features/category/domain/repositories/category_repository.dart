@@ -5,6 +5,9 @@ abstract class CategoryRepository {
   /// Get semua kategori
   Future<List<CategoryEntity>> getCategories();
 
+  /// Watch semua kategori (real-time stream)
+  Stream<List<CategoryEntity>> watchCategories();
+
   /// Get kategori by ID
   Future<CategoryEntity?> getCategoryById(String id);
 
